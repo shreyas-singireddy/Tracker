@@ -1,42 +1,33 @@
 stages:
   - test
 
-variables:
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  PYTHONUNBUFFERED: "1"
-
-cache:
-  paths:
-    - .cache/pip
-
-
 run-diagnostics-and-tests:
   stage: test
-  image: python:3.12-slim
 
   before_script:
     - python --version
+    - pip --version
     - pip install --upgrade pip
     - |
-      if [ -f requirements.txt ]; then
+      if exist requirements.txt (
         pip install -r requirements.txt
-      fi
+      )
 
   script:
-    - echo "Running diagnostics..."
-    - pwd
-    - ls -la
+    - echo "===== Diagnostics ====="
+    - echo %CD%
+    - dir
 
-    - echo "Checking Python syntax..."
+    - echo "===== Python Syntax Check ====="
     - python -m compileall .
 
-    - echo "Running tests..."
+    - echo "===== Running Tests ====="
     - |
-      if [ -d tests ]; then
+      if exist tests (
         pytest -v
-      else
-        echo "No tests directory found"
-      fi
+      ) else (
+        echo "No tests folder found"
+      )
 
   artifacts:
     when: always
