@@ -1,0 +1,34 @@
+stages:
+  - test
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+cache:
+  paths:
+    - .cache/pip
+    - venv/
+
+before_script:
+  - python --version
+  - python -m venv venv
+  - source venv/bin/activate || venv\Scripts\activate
+  - pip install --upgrade pip
+  - pip install -r requirements.txt
+
+run-diagnostics-and-tests:
+  stage: test
+  image: python:3.11-slim
+  script:
+    # 1. Initialize Database Schema
+    - python main.py --init-db
+    
+    # 2. Run FitOS Diagnostics Check
+    - python scripts/health_check.py
+    
+    # 3. Run entire test suite
+    - pytest tests/ --import-mode=importlib
+  only:
+    - merge_requests
+    - main
+    - master

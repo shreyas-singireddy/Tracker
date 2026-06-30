@@ -1,0 +1,23 @@
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Databases & logs
+*.db
+*-wal
+*-shm
+logs/
+*.log
+
+# Environments & OS files
+.env
+.venv
+venv/
+env/
+.DS_Store
+Thumbs.db

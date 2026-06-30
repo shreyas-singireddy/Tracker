@@ -1,0 +1,103 @@
+/* FitOS Custom Stylesheet - Linear/Vercel inspired Premium UI */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Glassmorphism Container Card */
+.glass-card {
+    background: rgba(22, 25, 32, 0.65) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 12px !important;
+    padding: 24px !important;
+    margin-bottom: 16px !important;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4) !important;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.glass-card:hover {
+    border-color: rgba(94, 106, 210, 0.4) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 40px rgba(94, 106, 210, 0.1) !important;
+}
+
+/* Bento Grid Card Variants */
+.bento-header {
+    background: linear-gradient(135deg, rgba(94, 106, 210, 0.15) 0%, rgba(49, 46, 129, 0.05) 100%) !important;
+    border: 1px solid rgba(94, 106, 210, 0.25) !important;
+}
+
+.bento-highlight {
+    background: linear-gradient(135deg, #5E6AD2 0%, #252850 100%) !important;
+    color: #ffffff !important;
+}
+
+/* Gradient text */
+.gradient-text {
+    background: linear-gradient(135deg, #FFFFFF 0%, #A5B4FC 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 700;
+}
+
+.gradient-indigo {
+    background: linear-gradient(135deg, #818CF8 0%, #5E6AD2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* KPI metric values */
+.kpi-val {
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1;
+    margin: 8px 0;
+    color: #f1f5f9;
+}
+
+.kpi-lbl {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Premium chat elements */
+.chat-bubble-user {
+    background-color: #252836 !important;
+    border-radius: 16px 16px 0 16px !important;
+    padding: 12px 18px !important;
+    color: #E2E8F0 !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    margin-bottom: 8px !important;
+}
+
+.chat-bubble-ai {
+    background: rgba(94, 106, 210, 0.12) !important;
+    border-radius: 16px 16px 16px 0 !important;
+    padding: 12px 18px !important;
+    color: #F1F5F9 !important;
+    border: 1px solid rgba(94, 106, 210, 0.2) !important;
+    margin-bottom: 8px !important;
+}
+
+/* Scrollbar tweaks */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #0F1115;
+}
+::-webkit-scrollbar-thumb {
+    background: #2D3748;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #4A5568;
+}

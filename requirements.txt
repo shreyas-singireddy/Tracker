@@ -1,0 +1,22 @@
+# FitOS — Offline AI Fitness OS
+# Locked dependency versions for production deployment
+# Installed via: pip install -r requirements.txt
+
+# Core
+streamlit==1.38.0
+
+# Database
+# SQLite3 is part of Python standard library — no extra dependency needed
+
+# Utilities
+python-dateutil==2.9.0.post0
+
+# Testing
+pytest==9.0.3
+pytest-cov==7.1.0
+
+# Type checking (optional, for development)
+# mypy==1.13.0
+
+# All other dependencies are Python standard library only.
+# FitOS is designed to run fully offline with zero external API calls.
