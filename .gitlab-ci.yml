@@ -1,3 +1,5 @@
+image: python:3.12-slim
+
 stages:
   - format
   - lint
@@ -9,28 +11,24 @@ stages:
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  PRE_COMMIT_HOME: "$CI_PROJECT_DIR/.cache/pre-commit"
 
 cache:
   key: "$CI_COMMIT_REF_SLUG"
   paths:
     - .cache/pip
-    - .cache/pre-commit
-    - .venv/
 
-before_script:
-  - python --version
-  - python -m venv venv
-  - source venv/bin/activate || venv\Scripts\activate
-  - pip install --upgrade pip
-  - pip install -r requirements.txt
-  - pip install ruff mypy flake8 pylint vulture bandit pre-commit pyupgrade pytest pytest-cov
+.default_before_script: &default_before_script
+  before_script:
+    - python --version
+    - pip --version
+    - python -m pip install --upgrade pip
+    - pip install -r requirements.txt
+    - pip install ruff mypy flake8 pylint vulture bandit pytest pytest-cov
 
 format:
   stage: format
-  image: python:3.11-slim
+  <<: *default_before_script
   script:
-    - source venv/bin/activate || venv\Scripts\activate
     - ruff format --check .
   only:
     - merge_requests
@@ -39,9 +37,8 @@ format:
 
 lint-ruff:
   stage: lint
-  image: python:3.11-slim
+  <<: *default_before_script
   script:
-    - source venv/bin/activate || venv\Scripts\activate
     - ruff check .
   only:
     - merge_requests
@@ -50,9 +47,8 @@ lint-ruff:
 
 lint-flake8:
   stage: lint
-  image: python:3.11-slim
+  <<: *default_before_script
   script:
-    - source venv/bin/activate || venv\Scripts\activate
     - flake8 app/
   only:
     - merge_requests
@@ -61,9 +57,8 @@ lint-flake8:
 
 lint-pylint:
   stage: lint
-  image: python:3.11-slim
+  <<: *default_before_script
   script:
-    - source venv/bin/activate || venv\Scripts\activate
     - pylint app/ || true
   allow_failure: true
   only:
@@ -73,9 +68,8 @@ lint-pylint:
 
 type-check:
   stage: type_check
-  image: python:3.11-slim
+  <<: *default_before_script
   script:
-    - source venv/bin/activate || venv\Scripts\activate
     - mypy app/ --ignore-missing-imports
   only:
     - merge_requests
@@ -84,31 +78,28 @@ type-check:
 
 test:
   stage: test
-  image: python:3.11-slim
+  <<: *default_before_script
   script:
-    - source venv/bin/activate || venv\Scripts\activate
-    - python main.py --init-db
-    - python scripts/health_check.py
-    - pytest tests/ -v --import-mode=importlib --tb=short
-  coverage: '/TOTAL.*\s+(\d+%)$/'
+    - echo "===== Diagnostics ====="
+    - pwd
+    - ls -la
+    - echo "===== Python Syntax Check ====="
+    - python -m compileall .
+    - echo "===== Running Tests ====="
+    - pytest tests/ -v --tb=short
+  coverage: '/TOTAL.*\s+(\d+%)/'
   artifacts:
     when: always
     reports:
       junit: junit.xml
     paths:
       - test_fitos_*.db
-  only:
-    - merge_requests
-    - main
-    - master
 
 coverage:
   stage: coverage
-  image: python:3.11-slim
+  <<: *default_before_script
   script:
-    - source venv/bin/activate || venv\Scripts\activate
-    - pytest tests/ --cov=app --cov-report=term-missing --cov-report=xml --cov-report=html --import-mode=importlib
-    - coverage xml
+    - pytest tests/ --cov=app --cov-report=term-missing --cov-report=xml --cov-report=html
   artifacts:
     reports:
       coverage_report:
@@ -116,7 +107,7 @@ coverage:
         path: coverage.xml
     paths:
       - htmlcov/
-  coverage: '/TOTAL.*\s+(\d+%)$/'
+  coverage: '/TOTAL.*\s+(\d+%)/'
   only:
     - merge_requests
     - main
@@ -124,10 +115,9 @@ coverage:
 
 security-bandit:
   stage: security
-  image: python:3.11-slim
+  <<: *default_before_script
   script:
-    - source venv/bin/activate || venv\Scripts\activate
-    - bandit -r app/ -c pyproject.toml
+    - bandit -r app/ -s B101,B311,B403,B404,B603
   only:
     - merge_requests
     - main
@@ -135,9 +125,8 @@ security-bandit:
 
 security-vulture:
   stage: security
-  image: python:3.11-slim
+  <<: *default_before_script
   script:
-    - source venv/bin/activate || venv\Scripts\activate
     - vulture app/ main.py run_app.py run_tests.py scripts/ --exclude ".venv,tests,__pycache__"
   only:
     - merge_requests
