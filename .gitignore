@@ -6,6 +6,11 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+coverage.xml
+coverage_html/
+
+# GitLab Runner
+.runner_system_id
 
 # Databases & logs
 *.db

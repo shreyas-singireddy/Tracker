@@ -1,9 +1,9 @@
 from dataclasses import asdict, dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class TrainingSplit(str, Enum):
+class TrainingSplit(StrEnum):
     PUSH = "Push"
     PULL = "Pull"
     LEGS = "Legs"

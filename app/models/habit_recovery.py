@@ -1,15 +1,15 @@
 from dataclasses import asdict, dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class ReadinessState(str, Enum):
+class ReadinessState(StrEnum):
     FULL = "FULL"
     MODERATE = "MODERATE"
     LOW = "LOW"
 
 
-class HabitFrequency(str, Enum):
+class HabitFrequency(StrEnum):
     DAILY = "daily"
     WEEKLY = "weekly"
 

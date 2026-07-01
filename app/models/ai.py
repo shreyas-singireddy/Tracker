@@ -5,7 +5,7 @@ and contain NO business logic (validation and intelligence live in AICoachServic
 """
 
 from dataclasses import asdict, dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -13,7 +13,7 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 
-class IntentCategory(str, Enum):
+class IntentCategory(StrEnum):
     """Rule-based NLP intent categories understood by the AI Coach."""
 
     NUTRITION_QUERY = "nutrition_query"
@@ -24,7 +24,7 @@ class IntentCategory(str, Enum):
     GENERAL_FITNESS_QUERY = "general_fitness_query"
 
 
-class RecommendationPriority(str, Enum):
+class RecommendationPriority(StrEnum):
     """Priority tiers for AI recommendations."""
 
     HIGH = "high"
@@ -32,7 +32,7 @@ class RecommendationPriority(str, Enum):
     LOW = "low"
 
 
-class RecommendationCategory(str, Enum):
+class RecommendationCategory(StrEnum):
     """Domain categories for recommendations."""
 
     NUTRITION = "nutrition"

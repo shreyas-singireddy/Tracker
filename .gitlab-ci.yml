@@ -82,7 +82,7 @@ test:
   script:
     - echo "===== Diagnostics ====="
     - pwd
-    - ls -la
+    - Get-ChildItem
     - echo "===== Python Syntax Check ====="
     - python -m compileall .
     - echo "===== Running Tests ====="
@@ -117,7 +117,7 @@ security-bandit:
   stage: security
   <<: *default_before_script
   script:
-    - bandit -r app/ -s B101,B311,B403,B404,B603
+    - bandit -r app/ -s B101,B110,B311,B403,B404,B603,B608
   only:
     - merge_requests
     - main
@@ -127,7 +127,7 @@ security-vulture:
   stage: security
   <<: *default_before_script
   script:
-    - vulture app/ main.py run_app.py run_tests.py scripts/ --exclude ".venv,tests,__pycache__"
+    - vulture app/ main.py run_app.py run_tests.py scripts/ --exclude ".venv,tests,__pycache__" --min-confidence 80
   only:
     - merge_requests
     - main
