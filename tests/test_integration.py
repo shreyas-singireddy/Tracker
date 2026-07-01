@@ -5,41 +5,42 @@ Tests data flow across modules without modifying any existing code.
 
 import os
 import unittest
-from pathlib import Path
+import uuid
 from datetime import datetime, timedelta
+from pathlib import Path
+
+from app.core.exceptions import ValidationError
 from app.database.connection import DatabaseManager
 from app.database.migrations import MigrationRunner
-from app.models.domain import User, FoodItem, BodyMeasurement
-from app.models.workout import WorkoutPlan, WorkoutSession, ExerciseLog, ExerciseSet
-from app.models.nutrition import Meal, MealEntry, NutritionLog
-from app.models.habit_recovery import Habit, SleepLog, RecoveryLog, RecoveryProfile
-from app.models.analytics import FitnessScore, WeeklyReport
-from app.repositories.user import UserRepository
-from app.repositories.food import FoodRepository
-from app.repositories.exercise import ExerciseRepository
-from app.repositories.workout import (
-    WorkoutPlanRepository, WorkoutSessionRepository,
-    ExerciseLogRepository, ExerciseSetRepository
+from app.models.domain import FoodItem, User
+from app.models.habit_recovery import Habit
+from app.models.nutrition import Meal, MealEntry
+from app.models.workout import WorkoutPlan
+from app.repositories.analytics import (
+    AnalyticsSnapshotRepository,
+    FitnessScoreRepository,
+    ProgressTrendRepository,
+    ReportRepository,
 )
-from app.repositories.nutrition import MealRepository, MealEntryRepository, NutritionLogRepository
+from app.repositories.exercise import ExerciseRepository
+from app.repositories.food import FoodRepository
 from app.repositories.habit import HabitRepository
 from app.repositories.habit_log import HabitLogRepository
+from app.repositories.nutrition import MealEntryRepository, MealRepository, NutritionLogRepository
+from app.repositories.recovery import RecoveryProfileRepository, RecoveryRepository
 from app.repositories.sleep import SleepRepository
-from app.repositories.recovery import RecoveryRepository, RecoveryProfileRepository
-from app.repositories.analytics import (
-    FitnessScoreRepository,
-    ReportRepository,
-    AnalyticsSnapshotRepository,
-    ProgressTrendRepository
+from app.repositories.user import UserRepository
+from app.repositories.workout import (
+    ExerciseLogRepository,
+    ExerciseSetRepository,
+    WorkoutPlanRepository,
+    WorkoutSessionRepository,
 )
-from app.services.workout import WorkoutService
-from app.services.nutrition import NutritionService
-from app.services.habit import HabitService
-from app.services.recovery import RecoveryService
 from app.services.analytics import AnalyticsService
-from app.core.exceptions import ValidationError
-
-import uuid
+from app.services.habit import HabitService
+from app.services.nutrition import NutritionService
+from app.services.recovery import RecoveryService
+from app.services.workout import WorkoutService
 
 TEST_DB_DIR = Path(__file__).resolve().parent
 
@@ -52,8 +53,7 @@ class TestCrossModuleIntegration(unittest.TestCase):
         self.test_db_path = TEST_DB_DIR / f"test_fitos_int_{uuid.uuid4().hex[:8]}.db"
         self.db = DatabaseManager(db_path=str(self.test_db_path))
         self.runner = MigrationRunner(
-            migrations_dir=Path(__file__).resolve().parent.parent / "app" / "database" / "migrations",
-            db=self.db
+            migrations_dir=Path(__file__).resolve().parent.parent / "app" / "database" / "migrations", db=self.db
         )
         self.runner.run_all()
 
@@ -78,33 +78,44 @@ class TestCrossModuleIntegration(unittest.TestCase):
 
         # --- Setup Services ---
         self.workout_service = WorkoutService(
-            plan_repo=self.plan_repo, session_repo=self.session_repo,
-            log_repo=self.log_repo, set_repo=self.set_repo,
-            user_repo=self.user_repo, exercise_repo=self.exercise_repo
+            plan_repo=self.plan_repo,
+            session_repo=self.session_repo,
+            log_repo=self.log_repo,
+            set_repo=self.set_repo,
+            user_repo=self.user_repo,
+            exercise_repo=self.exercise_repo,
         )
         self.nutrition_service = NutritionService(
-            food_repo=self.food_repo, meal_repo=self.meal_repo,
-            entry_repo=self.entry_repo, log_repo=self.nutrition_log_repo,
-            user_repo=self.user_repo
+            food_repo=self.food_repo,
+            meal_repo=self.meal_repo,
+            entry_repo=self.entry_repo,
+            log_repo=self.nutrition_log_repo,
+            user_repo=self.user_repo,
         )
         self.habit_service = HabitService(
-            habit_repo=self.habit_repo, habit_log_repo=self.habit_log_repo,
-            user_repo=self.user_repo
+            habit_repo=self.habit_repo, habit_log_repo=self.habit_log_repo, user_repo=self.user_repo
         )
         self.recovery_service = RecoveryService(
-            sleep_repo=self.sleep_repo, recovery_repo=self.recovery_repo,
+            sleep_repo=self.sleep_repo,
+            recovery_repo=self.recovery_repo,
             profile_repo=self.profile_repo,
-            user_repo=self.user_repo, db=self.db
+            user_repo=self.user_repo,
+            db=self.db,
         )
         self.snapshot_repo = AnalyticsSnapshotRepository(db=self.db)
         self.trend_repo = ProgressTrendRepository(db=self.db)
         self.analytics_service = AnalyticsService(
-            score_repo=self.score_repo, report_repo=self.report_repo,
-            snapshot_repo=self.snapshot_repo, trend_repo=self.trend_repo,
-            user_repo=self.user_repo, workout_session_repo=self.session_repo,
+            score_repo=self.score_repo,
+            report_repo=self.report_repo,
+            snapshot_repo=self.snapshot_repo,
+            trend_repo=self.trend_repo,
+            user_repo=self.user_repo,
+            workout_session_repo=self.session_repo,
             nutrition_log_repo=self.nutrition_log_repo,
-            habit_repo=self.habit_repo, habit_log_repo=self.habit_log_repo,
-            recovery_repo=self.recovery_repo, db=self.db
+            habit_repo=self.habit_repo,
+            habit_log_repo=self.habit_log_repo,
+            recovery_repo=self.recovery_repo,
+            db=self.db,
         )
 
         # --- Seed Base Data ---
@@ -112,16 +123,20 @@ class TestCrossModuleIntegration(unittest.TestCase):
         self.user_repo.create_user(self.user)
 
         from app.models.domain import Exercise
+
         self.exercise_obj = Exercise(
-            exercise_id="e-squat-int", name="Barbell Squat",
-            category="strength", form_rules="{}"
+            exercise_id="e-squat-int", name="Barbell Squat", category="strength", form_rules="{}"
         )
         self.exercise_repo.create_exercise(self.exercise_obj)
 
         self.food = FoodItem(
-            food_id="f-chicken-int", name="Chicken Breast",
-            calories=250.0, protein=50.0, carbs=0.0, fats=5.0,
-            serving_size_g=150.0
+            food_id="f-chicken-int",
+            name="Chicken Breast",
+            calories=250.0,
+            protein=50.0,
+            carbs=0.0,
+            fats=5.0,
+            serving_size_g=150.0,
         )
         self.food_repo.create_food(self.food)
 
@@ -152,12 +167,22 @@ class TestCrossModuleIntegration(unittest.TestCase):
         self.workout_service.start_session(session_id="s-int", user_id="u-int", plan_id="p-int")
         self.workout_service.add_exercise_to_session("s-int", "e-squat-int", "el-int")
         self.workout_service.log_set(
-            set_id="set-int-1", session_id="s-int", exercise_log_id="el-int",
-            set_number=1, weight=100.0, reps=5, rpe=8.0
+            set_id="set-int-1",
+            session_id="s-int",
+            exercise_log_id="el-int",
+            set_number=1,
+            weight=100.0,
+            reps=5,
+            rpe=8.0,
         )
         self.workout_service.log_set(
-            set_id="set-int-2", session_id="s-int", exercise_log_id="el-int",
-            set_number=2, weight=105.0, reps=5, rpe=8.5
+            set_id="set-int-2",
+            session_id="s-int",
+            exercise_log_id="el-int",
+            set_number=2,
+            weight=105.0,
+            reps=5,
+            rpe=8.5,
         )
         self.workout_service.end_session("s-int", calories_burned=350.0, avg_hr=145)
 
@@ -167,8 +192,7 @@ class TestCrossModuleIntegration(unittest.TestCase):
         self.assertEqual(session.calories_burned_kcal, 350.0)
 
         # --- Step 2: Nutrition (Sprint 4) ---
-        meal = Meal(meal_id="m-int", user_id="u-int", meal_type="lunch",
-                    meal_date=today, name="Post-workout meal")
+        meal = Meal(meal_id="m-int", user_id="u-int", meal_type="lunch", meal_date=today, name="Post-workout meal")
         self.nutrition_service.create_meal(meal)
 
         entry = MealEntry(entry_id="e-int", meal_id="m-int", food_id="f-chicken-int", quantity_g=200.0)
@@ -185,12 +209,10 @@ class TestCrossModuleIntegration(unittest.TestCase):
         self.assertGreater(log.total_calories, 0)
 
         # --- Step 3: Habits (Sprint 5) ---
-        habit = Habit(habit_id="h-int", user_id="u-int", name="Drink Water",
-                      target_value=8.0, unit="glasses")
+        habit = Habit(habit_id="h-int", user_id="u-int", name="Drink Water", target_value=8.0, unit="glasses")
         self.habit_service.create_habit(habit)
 
-        self.habit_service.log_habit("hl-int", "h-int", "u-int", today,
-                                     value=6.0, status="completed")
+        self.habit_service.log_habit("hl-int", "h-int", "u-int", today, value=6.0, status="completed")
 
         # Verify streak
         streak = self.habit_service.compute_streak("h-int", "u-int")
@@ -281,14 +303,11 @@ class TestCrossModuleIntegration(unittest.TestCase):
 
         with self.assertRaises(ValidationError):
             self.nutrition_service.create_meal(
-                Meal(meal_id="m-err", user_id="u-nonexistent", meal_type="lunch",
-                     meal_date="2026-01-01")
+                Meal(meal_id="m-err", user_id="u-nonexistent", meal_type="lunch", meal_date="2026-01-01")
             )
 
         with self.assertRaises(ValidationError):
-            self.habit_service.create_habit(
-                Habit(habit_id="h-err", user_id="u-nonexistent", name="Test")
-            )
+            self.habit_service.create_habit(Habit(habit_id="h-err", user_id="u-nonexistent", name="Test"))
 
         with self.assertRaises(ValidationError):
             self.recovery_service.log_sleep("sl-err", "u-nonexistent", "2026-01-01", 8.0, 8.0)

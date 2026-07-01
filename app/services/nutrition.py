@@ -14,21 +14,21 @@ All calculations follow strict scaling rules:
     daily_total    = sum over all meals on that date
 """
 
-from datetime import datetime, date as date_type
-from typing import Dict, List, Optional
+from datetime import date as date_type
+from datetime import datetime
 
+from app.core.exceptions import ServiceError, ValidationError
+from app.core.logging import logger
 from app.models.domain import FoodItem
-from app.models.nutrition import Meal, MealEntry, MealType, MacroProfile, NutritionLog
+from app.models.nutrition import MacroProfile, Meal, MealEntry, MealType, NutritionLog
 from app.repositories.food import FoodRepository
 from app.repositories.nutrition import (
-    MealRepository,
     MealEntryRepository,
+    MealRepository,
     NutritionLogRepository,
 )
 from app.repositories.user import UserRepository
 from app.services.food import FoodService
-from app.core.exceptions import ValidationError, ServiceError
-from app.core.logging import logger
 from app.utils.validators import validate_food_item
 
 
@@ -38,12 +38,12 @@ class NutritionService:
 
     def __init__(
         self,
-        food_repo: Optional[FoodRepository] = None,
-        meal_repo: Optional[MealRepository] = None,
-        entry_repo: Optional[MealEntryRepository] = None,
-        log_repo: Optional[NutritionLogRepository] = None,
-        user_repo: Optional[UserRepository] = None,
-        food_service: Optional[FoodService] = None,
+        food_repo: FoodRepository | None = None,
+        meal_repo: MealRepository | None = None,
+        entry_repo: MealEntryRepository | None = None,
+        log_repo: NutritionLogRepository | None = None,
+        user_repo: UserRepository | None = None,
+        food_service: FoodService | None = None,
     ):
         self.food_repo = food_repo or FoodRepository()
         self.meal_repo = meal_repo or MealRepository()
@@ -78,9 +78,9 @@ class NutritionService:
         macro_keys = {"calories", "protein", "carbs", "fats"}
         if macro_keys.intersection(updates.keys()):
             new_calories = float(updates.get("calories", food.calories))
-            new_protein  = float(updates.get("protein",  food.protein))
-            new_carbs    = float(updates.get("carbs",    food.carbs))
-            new_fats     = float(updates.get("fats",     food.fats))
+            new_protein = float(updates.get("protein", food.protein))
+            new_carbs = float(updates.get("carbs", food.carbs))
+            new_fats = float(updates.get("fats", food.fats))
             validate_food_item(new_calories, new_protein, new_carbs, new_fats)
 
         if "serving_size_g" in updates and float(updates["serving_size_g"]) <= 0:
@@ -89,15 +89,15 @@ class NutritionService:
         rows = self.food_repo.update_food(food_id, updates)
         return rows > 0
 
-    def get_food_item(self, food_id: str) -> Optional[FoodItem]:
+    def get_food_item(self, food_id: str) -> FoodItem | None:
         """Retrieves a single food item by ID."""
         return self.food_repo.get_food(food_id)
 
-    def list_food_database(self) -> List[FoodItem]:
+    def list_food_database(self) -> list[FoodItem]:
         """Returns the full food catalog."""
         return self.food_repo.list_foods()
 
-    def search_food_by_name(self, name: str) -> List[FoodItem]:
+    def search_food_by_name(self, name: str) -> list[FoodItem]:
         """Returns all food items whose name contains the search term (case-insensitive)."""
         all_foods = self.food_repo.list_foods()
         term = name.strip().lower()
@@ -137,11 +137,11 @@ class NutritionService:
             logger.error(f"Failed to create meal: {e}")
             raise ServiceError("Meal creation failed.", details=str(e))
 
-    def get_meal(self, meal_id: str) -> Optional[Meal]:
+    def get_meal(self, meal_id: str) -> Meal | None:
         """Returns a single Meal record."""
         return self.meal_repo.get_meal(meal_id)
 
-    def get_meals_for_date(self, user_id: str, meal_date: str) -> List[Meal]:
+    def get_meals_for_date(self, user_id: str, meal_date: str) -> list[Meal]:
         """Returns all meal records for a user on a specific date."""
         self._validate_date_format(meal_date)
         return self.meal_repo.get_meals_by_date(user_id, meal_date)
@@ -207,7 +207,7 @@ class NutritionService:
         rows = self.entry_repo.delete_entry(entry_id)
         return rows > 0
 
-    def get_meal_entries(self, meal_id: str) -> List[MealEntry]:
+    def get_meal_entries(self, meal_id: str) -> list[MealEntry]:
         """Returns all food entries for a meal."""
         return self.entry_repo.get_meal_entries(meal_id)
 
@@ -226,10 +226,10 @@ class NutritionService:
         scale = quantity_g / serving
         return MacroProfile(
             calories=round(food.calories * scale, 4),
-            protein_g=round(food.protein  * scale, 4),
-            carbs_g=round(food.carbs     * scale, 4),
-            fat_g=round(food.fats        * scale, 4),
-            fiber_g=0.0,   # FoodItem does not track fiber/sugar at domain level
+            protein_g=round(food.protein * scale, 4),
+            carbs_g=round(food.carbs * scale, 4),
+            fat_g=round(food.fats * scale, 4),
+            fiber_g=0.0,  # FoodItem does not track fiber/sugar at domain level
             sugar_g=0.0,
         )
 
@@ -264,7 +264,7 @@ class NutritionService:
             daily = daily + self.calculate_meal_macros(meal.meal_id)
         return daily
 
-    def get_nutrition_summary(self, user_id: str, meal_date: str) -> Dict:
+    def get_nutrition_summary(self, user_id: str, meal_date: str) -> dict:
         """Returns a structured daily nutrition summary dict with per-meal breakdown.
 
         Structure:
@@ -297,31 +297,33 @@ class NutritionService:
                     continue
                 entry_macros = self._compute_entry_macros(food, entry.quantity_g)
                 meal_total = meal_total + entry_macros
-                entries_data.append({
-                    "food_id":    entry.food_id,
-                    "food_name":  food.name,
-                    "quantity_g": entry.quantity_g,
-                    "macros":     entry_macros.to_dict(),
-                })
+                entries_data.append(
+                    {
+                        "food_id": entry.food_id,
+                        "food_name": food.name,
+                        "quantity_g": entry.quantity_g,
+                        "macros": entry_macros.to_dict(),
+                    }
+                )
 
             daily = daily + meal_total
-            meals_data.append({
-                "meal_id":   meal.meal_id,
-                "meal_type": meal.meal_type,
-                "name":      meal.name,
-                "macros":    meal_total.to_dict(),
-                "entries":   entries_data,
-            })
+            meals_data.append(
+                {
+                    "meal_id": meal.meal_id,
+                    "meal_type": meal.meal_type,
+                    "name": meal.name,
+                    "macros": meal_total.to_dict(),
+                    "entries": entries_data,
+                }
+            )
 
         return {
-            "date":         meal_date,
-            "meals":        meals_data,
+            "date": meal_date,
+            "meals": meals_data,
             "daily_totals": daily.to_dict(),
         }
 
-    def save_daily_nutrition_log(
-        self, log_id: str, user_id: str, meal_date: str
-    ) -> NutritionLog:
+    def save_daily_nutrition_log(self, log_id: str, user_id: str, meal_date: str) -> NutritionLog:
         """Computes daily macro totals and upserts a NutritionLog record.
 
         This persists computed totals for reporting. Always reproducible
@@ -355,7 +357,7 @@ class NutritionService:
             logger.error(f"Failed to save nutrition log: {e}")
             raise ServiceError("Failed to save daily nutrition log.", details=str(e))
 
-    def get_daily_nutrition_log(self, user_id: str, meal_date: str) -> Optional[NutritionLog]:
+    def get_daily_nutrition_log(self, user_id: str, meal_date: str) -> NutritionLog | None:
         """Returns a previously saved daily NutritionLog, or None if not yet saved."""
         return self.log_repo.get_log_by_date(user_id, meal_date)
 

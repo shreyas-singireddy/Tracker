@@ -1,6 +1,5 @@
-from typing import Optional, List
-from app.repositories.base import BaseRepository
 from app.models.domain import MealLog
+from app.repositories.base import BaseRepository
 
 
 class MealLogRepository(BaseRepository):
@@ -11,12 +10,12 @@ class MealLogRepository(BaseRepository):
         self.create("meal_logs", meal_log.to_dict())
         return meal_log.meal_log_id
 
-    def get_meal_log(self, meal_log_id: str) -> Optional[MealLog]:
+    def get_meal_log(self, meal_log_id: str) -> MealLog | None:
         """Fetches a MealLog object by its meal_log_id."""
         row = self.read("meal_logs", "meal_log_id", meal_log_id)
         return MealLog.from_dict(row) if row else None
 
-    def get_user_meal_logs(self, user_id: str) -> List[MealLog]:
+    def get_user_meal_logs(self, user_id: str) -> list[MealLog]:
         """Retrieves all meal logs registered to a specific user."""
         query = "SELECT * FROM meal_logs WHERE user_id = ? ORDER BY logged_at DESC;"
         rows = self.db.execute_read(query, (user_id,))

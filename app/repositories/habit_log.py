@@ -1,6 +1,5 @@
-from typing import Optional, List
-from app.repositories.base import BaseRepository
 from app.models.domain import HabitLog
+from app.repositories.base import BaseRepository
 
 
 class HabitLogRepository(BaseRepository):
@@ -18,30 +17,32 @@ class HabitLogRepository(BaseRepository):
         self.create("habit_entries", log.to_dict())
         return log.habit_log_id
 
-    def get_habit_log(self, habit_log_id: str) -> Optional[HabitLog]:
+    def get_habit_log(self, habit_log_id: str) -> HabitLog | None:
         """Fetches a HabitLog object by its habit_log_id."""
         row = self.read("habit_entries", "habit_log_id", habit_log_id)
         return HabitLog.from_dict(row) if row else None
 
-    def get_user_habit_logs(self, user_id: str) -> List[HabitLog]:
+    def get_user_habit_logs(self, user_id: str) -> list[HabitLog]:
         """Retrieves all habit logs for a specific user, newest first."""
         query = "SELECT * FROM habit_entries WHERE user_id = ? ORDER BY log_date DESC;"
         rows = self.db.execute_read(query, (user_id,))
         return [HabitLog.from_dict(row) for row in rows]
 
-    def get_habit_logs_by_date_range(self, user_id: str, start_date: str, end_date: str) -> List[HabitLog]:
+    def get_habit_logs_by_date_range(self, user_id: str, start_date: str, end_date: str) -> list[HabitLog]:
         """Retrieves habit logs for a user within a date range."""
-        query = "SELECT * FROM habit_entries WHERE user_id = ? AND log_date >= ? AND log_date <= ? ORDER BY log_date ASC;"
+        query = (
+            "SELECT * FROM habit_entries WHERE user_id = ? AND log_date >= ? AND log_date <= ? ORDER BY log_date ASC;"
+        )
         rows = self.db.execute_read(query, (user_id, start_date, end_date))
         return [HabitLog.from_dict(row) for row in rows]
 
-    def get_habit_log_by_date(self, habit_id: str, user_id: str, log_date: str) -> Optional[HabitLog]:
+    def get_habit_log_by_date(self, habit_id: str, user_id: str, log_date: str) -> HabitLog | None:
         """Fetches a single habit log by habit_id, user_id and date (for duplicate checking)."""
         query = "SELECT * FROM habit_entries WHERE habit_id = ? AND user_id = ? AND log_date = ? LIMIT 1;"
         row = self.db.execute_read_one(query, (habit_id, user_id, log_date))
         return HabitLog.from_dict(row) if row else None
 
-    def get_habit_logs(self, habit_id: str) -> List[HabitLog]:
+    def get_habit_logs(self, habit_id: str) -> list[HabitLog]:
         """Retrieves all logs for a specific habit."""
         query = "SELECT * FROM habit_entries WHERE habit_id = ? ORDER BY log_date DESC;"
         rows = self.db.execute_read(query, (habit_id,))

@@ -7,28 +7,31 @@ and rule-based insights.
 READ-ONLY dependency on Sprint 3-6 systems. NEVER modifies raw data.
 """
 
-from datetime import datetime, timedelta, date as date_type
-from typing import Dict, List, Optional, Tuple
-from app.repositories.analytics import (
-    FitnessScoreRepository,
-    ReportRepository,
-    AnalyticsSnapshotRepository,
-    ProgressTrendRepository
-)
-from app.repositories.user import UserRepository
-from app.repositories.workout import WorkoutSessionRepository
-from app.repositories.body_measurement import BodyMeasurementRepository
-from app.repositories.nutrition import NutritionLogRepository
-from app.repositories.habit import HabitRepository
-from app.repositories.habit_log import HabitLogRepository
-from app.repositories.recovery import RecoveryRepository
-from app.models.analytics import (
-    FitnessScore, WeeklyReport, MonthlyReport,
-    AnalyticsSnapshot, ProgressTrend, InsightMetric
-)
-from app.core.exceptions import ValidationError, ServiceError
+from datetime import datetime, timedelta
+
+from app.core.exceptions import ServiceError, ValidationError
 from app.core.logging import logger
 from app.database.connection import DatabaseManager, db_manager
+from app.models.analytics import (
+    AnalyticsSnapshot,
+    FitnessScore,
+    MonthlyReport,
+    ProgressTrend,
+    WeeklyReport,
+)
+from app.repositories.analytics import (
+    AnalyticsSnapshotRepository,
+    FitnessScoreRepository,
+    ProgressTrendRepository,
+    ReportRepository,
+)
+from app.repositories.body_measurement import BodyMeasurementRepository
+from app.repositories.habit import HabitRepository
+from app.repositories.habit_log import HabitLogRepository
+from app.repositories.nutrition import NutritionLogRepository
+from app.repositories.recovery import RecoveryRepository
+from app.repositories.user import UserRepository
+from app.repositories.workout import WorkoutSessionRepository
 
 # Fitness Score weights (deterministic)
 NUTRITION_WEIGHT = 0.25
@@ -51,18 +54,18 @@ class AnalyticsService:
 
     def __init__(
         self,
-        score_repo: Optional[FitnessScoreRepository] = None,
-        report_repo: Optional[ReportRepository] = None,
-        snapshot_repo: Optional[AnalyticsSnapshotRepository] = None,
-        trend_repo: Optional[ProgressTrendRepository] = None,
-        user_repo: Optional[UserRepository] = None,
-        workout_session_repo: Optional[WorkoutSessionRepository] = None,
-        body_measurement_repo: Optional[BodyMeasurementRepository] = None,
-        nutrition_log_repo: Optional[NutritionLogRepository] = None,
-        habit_repo: Optional[HabitRepository] = None,
-        habit_log_repo: Optional[HabitLogRepository] = None,
-        recovery_repo: Optional[RecoveryRepository] = None,
-        db: Optional[DatabaseManager] = None
+        score_repo: FitnessScoreRepository | None = None,
+        report_repo: ReportRepository | None = None,
+        snapshot_repo: AnalyticsSnapshotRepository | None = None,
+        trend_repo: ProgressTrendRepository | None = None,
+        user_repo: UserRepository | None = None,
+        workout_session_repo: WorkoutSessionRepository | None = None,
+        body_measurement_repo: BodyMeasurementRepository | None = None,
+        nutrition_log_repo: NutritionLogRepository | None = None,
+        habit_repo: HabitRepository | None = None,
+        habit_log_repo: HabitLogRepository | None = None,
+        recovery_repo: RecoveryRepository | None = None,
+        db: DatabaseManager | None = None,
     ):
         self.score_repo = score_repo or FitnessScoreRepository()
         self.report_repo = report_repo or ReportRepository()
@@ -81,7 +84,7 @@ class AnalyticsService:
     # SECTION A: DATA AGGREGATION ENGINE
     # ================================================================== #
 
-    def get_aggregated_day(self, user_id: str, log_date: str) -> Dict:
+    def get_aggregated_day(self, user_id: str, log_date: str) -> dict:
         """Builds a unified dataset for a single day, pulling from all modules."""
         # Workout data
         sessions = self._get_workout_sessions_for_date(user_id, log_date)
@@ -127,10 +130,10 @@ class AnalyticsService:
             "habits_completion_rate": round(habits_completion_rate, 2),
             "habits_completed": habits_completed,
             "habits_total": habits_total,
-            "body_weight_kg": measurement.weight_kg if measurement else None
+            "body_weight_kg": measurement.weight_kg if measurement else None,
         }
 
-    def _get_workout_sessions_for_date(self, user_id: str, log_date: str) -> List:
+    def _get_workout_sessions_for_date(self, user_id: str, log_date: str) -> list:
         """Gets completed workout sessions for a specific date."""
         try:
             next_date = (datetime.strptime(log_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -141,6 +144,7 @@ class AnalyticsService:
                 ORDER BY start_time ASC;
             """
             from app.models.workout import WorkoutSession
+
             rows = self.db.execute_read(query, (user_id, log_date, next_date))
             return [WorkoutSession.from_dict(r) for r in rows]
         except Exception as e:
@@ -189,13 +193,13 @@ class AnalyticsService:
 
         # Overall weighted score
         overall = (
-            (nutrition_score * NUTRITION_WEIGHT) +
-            (consistency_score * WORKOUT_CONSISTENCY_WEIGHT) +
-            (overload_score * PROGRESSIVE_OVERLOAD_WEIGHT) +
-            (recovery_score * RECOVERY_WEIGHT) +
-            (habits_score * HABITS_WEIGHT) +
-            (body_progress_score * BODY_PROGRESS_WEIGHT) +
-            (ai_adherence_score * AI_ADHERENCE_WEIGHT)
+            (nutrition_score * NUTRITION_WEIGHT)
+            + (consistency_score * WORKOUT_CONSISTENCY_WEIGHT)
+            + (overload_score * PROGRESSIVE_OVERLOAD_WEIGHT)
+            + (recovery_score * RECOVERY_WEIGHT)
+            + (habits_score * HABITS_WEIGHT)
+            + (body_progress_score * BODY_PROGRESS_WEIGHT)
+            + (ai_adherence_score * AI_ADHERENCE_WEIGHT)
         )
         overall = round(max(0.0, min(100.0, overall)), 2)
 
@@ -210,7 +214,7 @@ class AnalyticsService:
             recovery_score=round(recovery_score, 2),
             habits_score=round(habits_score, 2),
             body_progress_score=round(body_progress_score, 2),
-            ai_adherence_score=round(ai_adherence_score, 2)
+            ai_adherence_score=round(ai_adherence_score, 2),
         )
 
         try:
@@ -302,20 +306,33 @@ class AnalyticsService:
         else:
             direction = "decreasing"
 
-        return self._save_trend(user_id, metric_name, direction, round(current_avg, 2),
-                                round(prev_avg, 2), start_date, end_date,
-                                delta, pct_change, round(ma_7, 2), round(ma_30, 2))
+        return self._save_trend(
+            user_id,
+            metric_name,
+            direction,
+            round(current_avg, 2),
+            round(prev_avg, 2),
+            start_date,
+            end_date,
+            delta,
+            pct_change,
+            round(ma_7, 2),
+            round(ma_30, 2),
+        )
 
-    def _get_weight_series(self, user_id: str, start_date: str, end_date: str) -> List[Tuple[str, float]]:
+    def _get_weight_series(self, user_id: str, start_date: str, end_date: str) -> list[tuple[str, float]]:
         """Returns time-ordered (date, weight_kg) pairs."""
         try:
             measurements = self.body_measurement_repo.get_user_measurements(user_id)
-            return [(m.logged_at[:10], m.weight_kg) for m in measurements
-                    if m.logged_at[:10] >= start_date and m.logged_at[:10] <= end_date]
+            return [
+                (m.logged_at[:10], m.weight_kg)
+                for m in measurements
+                if m.logged_at[:10] >= start_date and m.logged_at[:10] <= end_date
+            ]
         except Exception:
             return []
 
-    def _get_recovery_series(self, user_id: str, start_date: str, end_date: str) -> List[Tuple[str, float]]:
+    def _get_recovery_series(self, user_id: str, start_date: str, end_date: str) -> list[tuple[str, float]]:
         """Returns time-ordered (date, recovery_score) pairs."""
         try:
             logs = self.recovery_repo.get_recovery_logs_by_date_range(user_id, start_date, end_date)
@@ -323,7 +340,7 @@ class AnalyticsService:
         except Exception:
             return []
 
-    def _get_workout_consistency_series(self, user_id: str, start_date: str, end_date: str) -> List[Tuple[str, float]]:
+    def _get_workout_consistency_series(self, user_id: str, start_date: str, end_date: str) -> list[tuple[str, float]]:
         """Returns daily workout count as (date, count) pairs."""
         try:
             start_dt = datetime.strptime(start_date, "%Y-%m-%d")
@@ -339,16 +356,19 @@ class AnalyticsService:
         except Exception:
             return []
 
-    def _get_nutrition_series(self, user_id: str, start_date: str, end_date: str) -> List[Tuple[str, float]]:
+    def _get_nutrition_series(self, user_id: str, start_date: str, end_date: str) -> list[tuple[str, float]]:
         """Returns daily calorie intake as (date, calories) pairs."""
         try:
             logs = self.nutrition_log_repo.get_user_logs(user_id)
-            return [(l.log_date, l.total_calories) for l in logs
-                    if start_date <= l.log_date <= end_date and l.total_calories > 0]
+            return [
+                (l.log_date, l.total_calories)
+                for l in logs
+                if start_date <= l.log_date <= end_date and l.total_calories > 0
+            ]
         except Exception:
             return []
 
-    def _get_strength_series(self, user_id: str, start_date: str, end_date: str) -> List[Tuple[str, float]]:
+    def _get_strength_series(self, user_id: str, start_date: str, end_date: str) -> list[tuple[str, float]]:
         """Returns max weight lifted across exercises as a proxy strength metric."""
         try:
             query = """
@@ -366,19 +386,30 @@ class AnalyticsService:
         except Exception:
             return []
 
-    def _moving_average(self, values: List[float], window: int) -> float:
+    def _moving_average(self, values: list[float], window: int) -> float:
         """Computes simple moving average of the last N values."""
         if not values or window <= 0:
             return 0.0
         recent = values[-window:]
         return sum(recent) / len(recent)
 
-    def _save_trend(self, user_id: str, metric_name: str, direction: str,
-                    current: float, previous: float, start: str, end: str,
-                    delta: float = 0.0, pct: float = 0.0,
-                    ma7: float = 0.0, ma30: float = 0.0) -> ProgressTrend:
+    def _save_trend(
+        self,
+        user_id: str,
+        metric_name: str,
+        direction: str,
+        current: float,
+        previous: float,
+        start: str,
+        end: str,
+        delta: float = 0.0,
+        pct: float = 0.0,
+        ma7: float = 0.0,
+        ma30: float = 0.0,
+    ) -> ProgressTrend:
         """Saves and returns a ProgressTrend record."""
         import uuid
+
         trend = ProgressTrend(
             trend_id=str(uuid.uuid4()),
             user_id=user_id,
@@ -391,7 +422,7 @@ class AnalyticsService:
             moving_avg_7day=ma7,
             moving_avg_30day=ma30,
             period_start=start,
-            period_end=end
+            period_end=end,
         )
         try:
             self.trend_repo.upsert_trend(trend)
@@ -448,12 +479,12 @@ class AnalyticsService:
         try:
             habits = self.habit_repo.get_user_habits(user_id)
             for h in habits:
-                from app.services.habit import HabitService
                 # Simple calculation: check consecutive days from the logs
                 logs = self.habit_log_repo.get_habit_logs(h.habit_id)
                 user_logs = sorted(
                     [l for l in logs if l.user_id == user_id and l.status == "completed"],
-                    key=lambda x: x.log_date, reverse=True
+                    key=lambda x: x.log_date,
+                    reverse=True,
                 )
                 if user_logs:
                     streak = 0
@@ -474,8 +505,17 @@ class AnalyticsService:
         adherence_rate = round((adherence_days / days) * 100.0, 2)
 
         # Generate insights
-        insights = self._generate_insights(user_id, week_start, week_end, avg_fitness, avg_calories,
-                                           avg_protein, avg_recovery, adherence_rate, total_workouts)
+        insights = self._generate_insights(
+            user_id,
+            week_start,
+            week_end,
+            avg_fitness,
+            avg_calories,
+            avg_protein,
+            avg_recovery,
+            adherence_rate,
+            total_workouts,
+        )
         insight_summary = " | ".join(insights[:3]) if insights else "No significant trends this week."
 
         report = WeeklyReport(
@@ -490,7 +530,7 @@ class AnalyticsService:
             habit_streaks_best=best_streak,
             avg_fitness_score=avg_fitness,
             adherence_rate=adherence_rate,
-            insight_summary=insight_summary
+            insight_summary=insight_summary,
         )
 
         try:
@@ -585,7 +625,7 @@ class AnalyticsService:
             adherence_rate=adherence_rate,
             strength_improvements=strength_info,
             body_changes_summary=body_info,
-            progress_summary=progress_summary
+            progress_summary=progress_summary,
         )
 
         try:
@@ -627,7 +667,7 @@ class AnalyticsService:
     # SECTION E: RULE-BASED INSIGHT GENERATION
     # ================================================================== #
 
-    def generate_insights(self, user_id: str, week_start: str, week_end: str) -> List[InsightMetric]:
+    def generate_insights(self, user_id: str, week_start: str, week_end: str) -> list[str]:
         """Generates rule-based insights comparing current week to previous week."""
         logger.info(f"Generating insights for user {user_id}, {week_start} to {week_end}")
 
@@ -636,9 +676,18 @@ class AnalyticsService:
 
         return self._generate_insights(user_id, week_start, week_end, 0.0, 0.0, 0.0, 0.0, 0.0, 0)
 
-    def _generate_insights(self, user_id: str, week_start: str, week_end: str,
-                           avg_fitness: float, avg_calories: float, avg_protein: float,
-                           avg_recovery: float, adherence: float, total_workouts: int) -> List[str]:
+    def _generate_insights(
+        self,
+        user_id: str,
+        week_start: str,
+        week_end: str,
+        avg_fitness: float,
+        avg_calories: float,
+        avg_protein: float,
+        avg_recovery: float,
+        adherence: float,
+        total_workouts: int,
+    ) -> list[str]:
         """Internal — generates text insights from metrics."""
         insights = []
 
@@ -717,7 +766,8 @@ class AnalyticsService:
                 logs = self.habit_log_repo.get_habit_logs(h.habit_id)
                 user_logs = sorted(
                     [l for l in logs if l.user_id == user_id and l.status == "completed"],
-                    key=lambda x: x.log_date, reverse=True
+                    key=lambda x: x.log_date,
+                    reverse=True,
                 )
                 if user_logs:
                     streak = 0
@@ -764,6 +814,7 @@ class AnalyticsService:
             pass
 
         import json
+
         snapshot = AnalyticsSnapshot(
             snapshot_id=f"ss-{user_id}-{snapshot_date}",
             user_id=user_id,
@@ -774,11 +825,13 @@ class AnalyticsService:
             nutrition_compliance_rate=nutrition_compliance,
             recovery_avg_7day=recovery_avg,
             body_weight_kg=body_weight,
-            snapshot_data=json.dumps({
-                "workout_consistency": score.workout_consistency_score,
-                "habits_score": score.habits_score,
-                "overload_score": score.progressive_overload_score
-            })
+            snapshot_data=json.dumps(
+                {
+                    "workout_consistency": score.workout_consistency_score,
+                    "habits_score": score.habits_score,
+                    "overload_score": score.progressive_overload_score,
+                }
+            ),
         )
 
         try:
@@ -789,14 +842,16 @@ class AnalyticsService:
 
         return snapshot
 
-    def get_dashboard_data(self, user_id: str, snapshot_date: str) -> Dict:
+    def get_dashboard_data(self, user_id: str, snapshot_date: str) -> dict:
         """Returns a ready-to-use dashboard dataset for UI rendering."""
         snapshot = self.snapshot_repo.get_snapshot_by_date(user_id, snapshot_date)
         if not snapshot:
             snapshot = self.take_snapshot(user_id, snapshot_date)
 
         # Get weekly report
-        week_start_dt = datetime.strptime(snapshot_date, "%Y-%m-%d") - timedelta(days=datetime.strptime(snapshot_date, "%Y-%m-%d").weekday())
+        week_start_dt = datetime.strptime(snapshot_date, "%Y-%m-%d") - timedelta(
+            days=datetime.strptime(snapshot_date, "%Y-%m-%d").weekday()
+        )
         week_start = week_start_dt.strftime("%Y-%m-%d")
         weekly = self.report_repo.get_weekly_report_by_week(user_id, week_start)
         if not weekly:
@@ -812,7 +867,7 @@ class AnalyticsService:
                     "change": trend.percentage_change,
                     "current": trend.current_value,
                     "ma7": trend.moving_avg_7day,
-                    "ma30": trend.moving_avg_30day
+                    "ma30": trend.moving_avg_30day,
                 }
             except Exception:
                 pass
@@ -820,5 +875,5 @@ class AnalyticsService:
         return {
             "snapshot": snapshot.to_dict() if snapshot else {},
             "weekly_report": weekly.to_dict() if weekly else {},
-            "trends": trends
+            "trends": trends,
         }

@@ -1,17 +1,17 @@
 from datetime import datetime, timedelta
-from typing import Optional, List
+
+from app.core.exceptions import ServiceError, ValidationError
+from app.core.logging import logger
+from app.models.domain import HabitLog
+from app.models.habit_recovery import Habit
 from app.repositories.habit import HabitRepository
 from app.repositories.habit_log import HabitLogRepository
 from app.repositories.user import UserRepository
-from app.models.habit_recovery import Habit
-from app.models.domain import HabitLog
-from app.core.exceptions import ValidationError, ServiceError
-from app.core.logging import logger
 from app.utils.validators import (
-    validate_habit_name,
     validate_habit_frequency,
+    validate_habit_log_no_duplicate,
+    validate_habit_name,
     validate_habit_target_value,
-    validate_habit_log_no_duplicate
 )
 
 
@@ -20,9 +20,9 @@ class HabitService:
 
     def __init__(
         self,
-        habit_repo: Optional[HabitRepository] = None,
-        habit_log_repo: Optional[HabitLogRepository] = None,
-        user_repo: Optional[UserRepository] = None
+        habit_repo: HabitRepository | None = None,
+        habit_log_repo: HabitLogRepository | None = None,
+        user_repo: UserRepository | None = None,
     ):
         self.habit_repo = habit_repo or HabitRepository()
         self.habit_log_repo = habit_log_repo or HabitLogRepository()
@@ -45,14 +45,14 @@ class HabitService:
         try:
             return self.habit_repo.create_habit(habit)
         except Exception as e:
-            logger.error(f"Failed to create habit: {str(e)}")
+            logger.error(f"Failed to create habit: {e!s}")
             raise ServiceError("Habit creation failed.", details=str(e))
 
-    def get_user_habits(self, user_id: str) -> List[Habit]:
+    def get_user_habits(self, user_id: str) -> list[Habit]:
         """Retrieves all habits for a user."""
         return self.habit_repo.get_user_habits(user_id)
 
-    def get_habit(self, habit_id: str) -> Optional[Habit]:
+    def get_habit(self, habit_id: str) -> Habit | None:
         """Retrieves a single habit by ID."""
         return self.habit_repo.get_habit(habit_id)
 
@@ -78,7 +78,7 @@ class HabitService:
         log_date: str,
         value: float = 1.0,
         status: str = "completed",
-        note: str = ""
+        note: str = "",
     ) -> str:
         """Logs a daily habit entry with duplicate checking."""
         logger.info(f"Logging habit {habit_id} for user {user_id} on {log_date}")
@@ -100,7 +100,7 @@ class HabitService:
         if status not in valid_statuses:
             raise ValidationError(
                 message="Habit log validation failed: Status must be 'completed', 'missed', or 'partial'.",
-                details=f"Received: {status}"
+                details=f"Received: {status}",
             )
 
         log = HabitLog(
@@ -110,20 +110,20 @@ class HabitService:
             log_date=log_date,
             value=value,
             status=status,
-            note=note
+            note=note,
         )
 
         try:
             return self.habit_log_repo.create_habit_log(log)
         except Exception as e:
-            logger.error(f"Failed to log habit: {str(e)}")
+            logger.error(f"Failed to log habit: {e!s}")
             raise ServiceError("Habit logging failed.", details=str(e))
 
-    def get_habit_logs(self, habit_id: str) -> List[HabitLog]:
+    def get_habit_logs(self, habit_id: str) -> list[HabitLog]:
         """Retrieves all logs for a specific habit."""
         return self.habit_log_repo.get_habit_logs(habit_id)
 
-    def get_user_habit_logs(self, user_id: str) -> List[HabitLog]:
+    def get_user_habit_logs(self, user_id: str) -> list[HabitLog]:
         """Retrieves all habit logs for a user."""
         return self.habit_log_repo.get_user_habit_logs(user_id)
 

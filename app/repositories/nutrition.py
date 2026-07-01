@@ -1,6 +1,5 @@
-from typing import List, Optional
-from app.repositories.base import BaseRepository
 from app.models.nutrition import Meal, MealEntry, NutritionLog
+from app.repositories.base import BaseRepository
 
 
 class MealRepository(BaseRepository):
@@ -15,30 +14,26 @@ class MealRepository(BaseRepository):
         self.create("meals", meal.to_dict())
         return meal.meal_id
 
-    def get_meal(self, meal_id: str) -> Optional[Meal]:
+    def get_meal(self, meal_id: str) -> Meal | None:
         """Fetches a single Meal by primary key."""
         row = self.read("meals", "meal_id", meal_id)
         return Meal.from_dict(row) if row else None
 
-    def get_user_meals(self, user_id: str) -> List[Meal]:
+    def get_user_meals(self, user_id: str) -> list[Meal]:
         """Returns all meals for a user, newest first."""
         query = "SELECT * FROM meals WHERE user_id = ? ORDER BY meal_date DESC, created_at DESC;"
         rows = self.db.execute_read(query, (user_id,))
         return [Meal.from_dict(r) for r in rows]
 
-    def get_meals_by_date(self, user_id: str, meal_date: str) -> List[Meal]:
+    def get_meals_by_date(self, user_id: str, meal_date: str) -> list[Meal]:
         """Returns all meals for a user on a specific date (YYYY-MM-DD)."""
         query = "SELECT * FROM meals WHERE user_id = ? AND meal_date = ? ORDER BY created_at ASC;"
         rows = self.db.execute_read(query, (user_id, meal_date))
         return [Meal.from_dict(r) for r in rows]
 
-    def get_meal_by_type_and_date(self, user_id: str, meal_type: str, meal_date: str) -> Optional[Meal]:
+    def get_meal_by_type_and_date(self, user_id: str, meal_type: str, meal_date: str) -> Meal | None:
         """Returns the first meal matching user + type + date (used for duplicate checks)."""
-        query = (
-            "SELECT * FROM meals "
-            "WHERE user_id = ? AND meal_type = ? AND meal_date = ? "
-            "LIMIT 1;"
-        )
+        query = "SELECT * FROM meals WHERE user_id = ? AND meal_type = ? AND meal_date = ? LIMIT 1;"
         row = self.db.execute_read_one(query, (user_id, meal_type, meal_date))
         return Meal.from_dict(row) if row else None
 
@@ -62,18 +57,18 @@ class MealEntryRepository(BaseRepository):
         self.create("meal_entries", entry.to_dict())
         return entry.entry_id
 
-    def get_entry(self, entry_id: str) -> Optional[MealEntry]:
+    def get_entry(self, entry_id: str) -> MealEntry | None:
         """Fetches a single MealEntry by primary key."""
         row = self.read("meal_entries", "entry_id", entry_id)
         return MealEntry.from_dict(row) if row else None
 
-    def get_meal_entries(self, meal_id: str) -> List[MealEntry]:
+    def get_meal_entries(self, meal_id: str) -> list[MealEntry]:
         """Returns all food entries within a specific meal, insertion order."""
         query = "SELECT * FROM meal_entries WHERE meal_id = ? ORDER BY created_at ASC;"
         rows = self.db.execute_read(query, (meal_id,))
         return [MealEntry.from_dict(r) for r in rows]
 
-    def get_entry_by_meal_and_food(self, meal_id: str, food_id: str) -> Optional[MealEntry]:
+    def get_entry_by_meal_and_food(self, meal_id: str, food_id: str) -> MealEntry | None:
         """Returns an existing entry for the same food in the same meal (duplicate check)."""
         query = "SELECT * FROM meal_entries WHERE meal_id = ? AND food_id = ? LIMIT 1;"
         row = self.db.execute_read_one(query, (meal_id, food_id))
@@ -104,18 +99,18 @@ class NutritionLogRepository(BaseRepository):
         self.create("nutrition_logs", log.to_dict())
         return log.log_id
 
-    def get_log(self, log_id: str) -> Optional[NutritionLog]:
+    def get_log(self, log_id: str) -> NutritionLog | None:
         """Fetches a NutritionLog by primary key."""
         row = self.read("nutrition_logs", "log_id", log_id)
         return NutritionLog.from_dict(row) if row else None
 
-    def get_log_by_date(self, user_id: str, log_date: str) -> Optional[NutritionLog]:
+    def get_log_by_date(self, user_id: str, log_date: str) -> NutritionLog | None:
         """Fetches the daily nutrition log for a specific user and date."""
         query = "SELECT * FROM nutrition_logs WHERE user_id = ? AND log_date = ? LIMIT 1;"
         row = self.db.execute_read_one(query, (user_id, log_date))
         return NutritionLog.from_dict(row) if row else None
 
-    def get_user_logs(self, user_id: str) -> List[NutritionLog]:
+    def get_user_logs(self, user_id: str) -> list[NutritionLog]:
         """Returns all nutrition log records for a user, newest first."""
         query = "SELECT * FROM nutrition_logs WHERE user_id = ? ORDER BY log_date DESC;"
         rows = self.db.execute_read(query, (user_id,))

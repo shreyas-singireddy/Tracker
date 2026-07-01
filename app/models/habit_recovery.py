@@ -1,6 +1,6 @@
-from dataclasses import dataclass, asdict
-from typing import Any, Dict, Optional
+from dataclasses import asdict, dataclass
 from enum import Enum
+from typing import Any
 
 
 class ReadinessState(str, Enum):
@@ -23,14 +23,14 @@ class Habit:
     frequency: str = "daily"  # 'daily', 'weekly'
     target_value: float = 1.0
     unit: str = "times"  # 'times', 'minutes', 'cups', etc.
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Habit":
+    def from_dict(cls, data: dict[str, Any]) -> "Habit":
         return cls(
             habit_id=data["habit_id"],
             user_id=data["user_id"],
@@ -40,7 +40,7 @@ class Habit:
             target_value=float(data.get("target_value", 1.0)),
             unit=data.get("unit", "times"),
             created_at=data.get("created_at"),
-            updated_at=data.get("updated_at")
+            updated_at=data.get("updated_at"),
         )
 
 
@@ -51,14 +51,14 @@ class SleepLog:
     log_date: str  # YYYY-MM-DD
     hours: float  # 0-24
     quality_score: float  # 0-10
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SleepLog":
+    def from_dict(cls, data: dict[str, Any]) -> "SleepLog":
         return cls(
             sleep_log_id=data["sleep_log_id"],
             user_id=data["user_id"],
@@ -66,7 +66,7 @@ class SleepLog:
             hours=float(data["hours"]),
             quality_score=float(data["quality_score"]),
             created_at=data.get("created_at"),
-            updated_at=data.get("updated_at")
+            updated_at=data.get("updated_at"),
         )
 
 
@@ -81,14 +81,14 @@ class RecoveryLog:
     sleep_duration_component: float = 0.0
     workout_load_component: float = 0.0
     rest_days_component: float = 0.0
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "RecoveryLog":
+    def from_dict(cls, data: dict[str, Any]) -> "RecoveryLog":
         return cls(
             recovery_log_id=data["recovery_log_id"],
             user_id=data["user_id"],
@@ -100,7 +100,7 @@ class RecoveryLog:
             workout_load_component=float(data.get("workout_load_component", 0.0)),
             rest_days_component=float(data.get("rest_days_component", 0.0)),
             created_at=data.get("created_at"),
-            updated_at=data.get("updated_at")
+            updated_at=data.get("updated_at"),
         )
 
 
@@ -109,18 +109,18 @@ class RecoveryProfile:
     profile_id: str
     user_id: str
     baseline_sleep_hours: float = 8.0
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "RecoveryProfile":
+    def from_dict(cls, data: dict[str, Any]) -> "RecoveryProfile":
         return cls(
             profile_id=data["profile_id"],
             user_id=data["user_id"],
             baseline_sleep_hours=float(data.get("baseline_sleep_hours", 8.0)),
             created_at=data.get("created_at"),
-            updated_at=data.get("updated_at")
+            updated_at=data.get("updated_at"),
         )

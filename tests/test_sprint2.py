@@ -1,23 +1,32 @@
 import os
 import unittest
-from pathlib import Path
 from datetime import datetime, timedelta
+from pathlib import Path
+
+from app.core.exceptions import ValidationError
 from app.database.connection import DatabaseManager
 from app.database.migrations import MigrationRunner
-from app.models.domain import User, UserProfile, Goal, FoodItem, Exercise, MealLog, WorkoutLog, HabitLog, BodyMeasurement
-from app.repositories.user import UserRepository, UserProfileRepository
-from app.repositories.goal import GoalRepository
-from app.repositories.food import FoodRepository
-from app.repositories.exercise import ExerciseRepository
-from app.repositories.meal_log import MealLogRepository
-from app.repositories.workout_log import WorkoutLogRepository
-from app.repositories.habit_log import HabitLogRepository
+from app.models.domain import (
+    BodyMeasurement,
+    FoodItem,
+    Goal,
+    HabitLog,
+    MealLog,
+    User,
+    UserProfile,
+)
 from app.repositories.body_measurement import BodyMeasurementRepository
-from app.services.user import UserService
-from app.services.goal import GoalService
-from app.services.food import FoodService
+from app.repositories.exercise import ExerciseRepository
+from app.repositories.food import FoodRepository
+from app.repositories.goal import GoalRepository
+from app.repositories.habit_log import HabitLogRepository
+from app.repositories.meal_log import MealLogRepository
+from app.repositories.user import UserProfileRepository, UserRepository
+from app.repositories.workout_log import WorkoutLogRepository
 from app.services.exercise import ExerciseService
-from app.core.exceptions import ValidationError, ServiceError
+from app.services.food import FoodService
+from app.services.goal import GoalService
+from app.services.user import UserService
 from app.utils.validators import validate_timestamp
 
 TEST_DB_PATH = Path(__file__).resolve().parent / "test_fitos_s2.db"
@@ -29,10 +38,9 @@ class TestSprint2Core(unittest.TestCase):
     def setUp(self):
         # Establish localized isolated database context
         self.db = DatabaseManager(db_path=str(TEST_DB_PATH))
-        
+
         self.runner = MigrationRunner(
-            migrations_dir=Path(__file__).resolve().parent.parent / "app" / "database" / "migrations",
-            db=self.db
+            migrations_dir=Path(__file__).resolve().parent.parent / "app" / "database" / "migrations", db=self.db
         )
         self.runner.run_all()
 
@@ -69,10 +77,17 @@ class TestSprint2Core(unittest.TestCase):
         """Verifies that all Sprint 2 tables exist in the schema after running migrations."""
         tables_query = "SELECT name FROM sqlite_master WHERE type='table';"
         tables = [row["name"] for row in self.db.execute_read(tables_query)]
-        
+
         expected_tables = [
-            "schema_migrations", "users", "user_profiles", "goals", 
-            "foods", "meal_logs", "habit_logs", "body_measurements", "workout_logs"
+            "schema_migrations",
+            "users",
+            "user_profiles",
+            "goals",
+            "foods",
+            "meal_logs",
+            "habit_logs",
+            "body_measurements",
+            "workout_logs",
         ]
         for tbl in expected_tables:
             self.assertIn(tbl, tables, f"Expected table {tbl} was not created by migrations.")
@@ -108,21 +123,25 @@ class TestSprint2Core(unittest.TestCase):
         # Seed a habits record first (HabitLog now has habit_id FK to habits table)
         self.db.execute_write(
             "INSERT INTO habits (habit_id, user_id, name, frequency) VALUES (?, ?, ?, ?);",
-            ("h-1", "usr-100", "Hydration", "daily")
+            ("h-1", "usr-100", "Hydration", "daily"),
         )
-        habit = HabitLog(habit_log_id="hl-1", habit_id="h-1", user_id="usr-100", log_date="2026-06-30", status="completed")
+        habit = HabitLog(
+            habit_log_id="hl-1", habit_id="h-1", user_id="usr-100", log_date="2026-06-30", status="completed"
+        )
         self.habit_repo.create_habit_log(habit)
         self.assertEqual(len(self.habit_repo.get_user_habit_logs("usr-100")), 1)
 
         # 7. BodyMeasurement CRUD
-        measure = BodyMeasurement(measurement_id="bm-1", user_id="usr-100", weight_kg=78.5, logged_at="2026-06-30 07:00:00")
+        measure = BodyMeasurement(
+            measurement_id="bm-1", user_id="usr-100", weight_kg=78.5, logged_at="2026-06-30 07:00:00"
+        )
         self.measure_repo.create_measurement(measure)
         self.assertEqual(len(self.measure_repo.get_user_measurements("usr-100")), 1)
 
     def test_user_service_validations(self):
         """Verifies age constraints, negative weights/heights, and invalid formatting boundaries."""
         user = User(user_id="usr-test", name="Tester", email="test@test.com")
-        
+
         # Test age < 5
         underage_profile = UserProfile(user_id="usr-test", birth_date="2024-01-01", weight_kg=12.0, height_cm=80.0)
         with self.assertRaises(ValidationError):
@@ -151,7 +170,9 @@ class TestSprint2Core(unittest.TestCase):
         self.assertIsNotNone(self.food_repo.get_food("valid-1"))
 
         # Contradictory calories (Calculated = 118 kcal. Stated = 50 kcal)
-        invalid_food = FoodItem(food_id="invalid-1", name="Lying Bar", calories=50.0, protein=10.0, carbs=15.0, fats=2.0)
+        invalid_food = FoodItem(
+            food_id="invalid-1", name="Lying Bar", calories=50.0, protein=10.0, carbs=15.0, fats=2.0
+        )
         with self.assertRaises(ValidationError):
             self.food_service.add_food_item(invalid_food)
 

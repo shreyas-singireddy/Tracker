@@ -1,19 +1,20 @@
 import os
 import unittest
-from pathlib import Path
 from datetime import datetime, timedelta
+from pathlib import Path
+
+from app.core.exceptions import ValidationError
 from app.database.connection import DatabaseManager
 from app.database.migrations import MigrationRunner
-from app.models.habit_recovery import Habit, SleepLog, RecoveryLog, RecoveryProfile, ReadinessState, HabitFrequency
-from app.models.domain import User, HabitLog
-from app.repositories.user import UserRepository
+from app.models.domain import User
+from app.models.habit_recovery import Habit
 from app.repositories.habit import HabitRepository
 from app.repositories.habit_log import HabitLogRepository
+from app.repositories.recovery import RecoveryProfileRepository, RecoveryRepository
 from app.repositories.sleep import SleepRepository
-from app.repositories.recovery import RecoveryRepository, RecoveryProfileRepository
+from app.repositories.user import UserRepository
 from app.services.habit import HabitService
 from app.services.recovery import RecoveryService
-from app.core.exceptions import ValidationError, ServiceError
 
 TEST_DB_PATH = Path(__file__).resolve().parent / "test_fitos_s5.db"
 
@@ -27,8 +28,7 @@ class TestSprint5HabitRecoveryEngine(unittest.TestCase):
 
         # Execute migration runners
         self.runner = MigrationRunner(
-            migrations_dir=Path(__file__).resolve().parent.parent / "app" / "database" / "migrations",
-            db=self.db
+            migrations_dir=Path(__file__).resolve().parent.parent / "app" / "database" / "migrations", db=self.db
         )
         self.runner.run_all()
 
@@ -42,16 +42,14 @@ class TestSprint5HabitRecoveryEngine(unittest.TestCase):
 
         # Services
         self.habit_service = HabitService(
-            habit_repo=self.habit_repo,
-            habit_log_repo=self.habit_log_repo,
-            user_repo=self.user_repo
+            habit_repo=self.habit_repo, habit_log_repo=self.habit_log_repo, user_repo=self.user_repo
         )
         self.recovery_service = RecoveryService(
             sleep_repo=self.sleep_repo,
             recovery_repo=self.recovery_repo,
             profile_repo=self.profile_repo,
             user_repo=self.user_repo,
-            db=self.db
+            db=self.db,
         )
 
         # Clear database to prevent unique constraint leaks between test cases
@@ -95,7 +93,7 @@ class TestSprint5HabitRecoveryEngine(unittest.TestCase):
             description="Drink 8 glasses of water daily",
             frequency="daily",
             target_value=8.0,
-            unit="glasses"
+            unit="glasses",
         )
         result_id = self.habit_service.create_habit(habit)
         self.assertEqual(result_id, "h-1")
@@ -170,12 +168,7 @@ class TestSprint5HabitRecoveryEngine(unittest.TestCase):
         self.habit_service.create_habit(habit)
 
         log_id = self.habit_service.log_habit(
-            habit_log_id="hl-1",
-            habit_id="h-log1",
-            user_id="u-s5",
-            log_date="2026-06-30",
-            value=1.0,
-            status="completed"
+            habit_log_id="hl-1", habit_id="h-log1", user_id="u-s5", log_date="2026-06-30", value=1.0, status="completed"
         )
         self.assertEqual(log_id, "hl-1")
 
@@ -199,10 +192,7 @@ class TestSprint5HabitRecoveryEngine(unittest.TestCase):
         self.habit_service.create_habit(habit)
 
         with self.assertRaises(ValidationError):
-            self.habit_service.log_habit(
-                "hl-stat", "h-stat", "u-s5", "2026-06-30",
-                status="invalid_status"
-            )
+            self.habit_service.log_habit("hl-stat", "h-stat", "u-s5", "2026-06-30", status="invalid_status")
 
     def test_log_habit_nonexistent_habit(self):
         """Verifies logging to non-existent habit raises ValidationError."""
@@ -268,9 +258,7 @@ class TestSprint5HabitRecoveryEngine(unittest.TestCase):
         for i in range(5):
             if i != 1 and i != 3:  # Skip 2 days
                 day = (today - timedelta(days=i)).strftime("%Y-%m-%d")
-                self.habit_service.log_habit(
-                    f"hl-cons-{i}", "h-cons", "u-s5", day
-                )
+                self.habit_service.log_habit(f"hl-cons-{i}", "h-cons", "u-s5", day)
 
         score = self.habit_service.compute_consistency_score("h-cons", "u-s5", days=5)
         self.assertEqual(score, 60.0)  # 3/5 = 60%
@@ -282,11 +270,7 @@ class TestSprint5HabitRecoveryEngine(unittest.TestCase):
     def test_log_sleep(self):
         """Verifies sleep logging with valid data."""
         log_id = self.recovery_service.log_sleep(
-            sleep_log_id="sl-1",
-            user_id="u-s5",
-            log_date="2026-06-30",
-            hours=8.0,
-            quality_score=8.0
+            sleep_log_id="sl-1", user_id="u-s5", log_date="2026-06-30", hours=8.0, quality_score=8.0
         )
         self.assertEqual(log_id, "sl-1")
 
@@ -375,7 +359,7 @@ class TestSprint5HabitRecoveryEngine(unittest.TestCase):
         self.db.execute_write(
             """INSERT INTO workout_sessions (session_id, user_id, plan_id, start_time, end_time, status, calories_burned_kcal)
                VALUES (?, ?, NULL, ?, ?, 'COMPLETED', ?)""",
-            ("ws-rec-test", "u-s5", f"{yesterday} 10:00:00", f"{yesterday} 11:00:00", 600.0)
+            ("ws-rec-test", "u-s5", f"{yesterday} 10:00:00", f"{yesterday} 11:00:00", 600.0),
         )
 
         # Log sleep
@@ -440,10 +424,7 @@ class TestSprint5HabitRecoveryEngine(unittest.TestCase):
         habit = Habit(habit_id="h-val", user_id="u-s5", name="Water Intake", target_value=8.0)
         self.habit_service.create_habit(habit)
 
-        log_id = self.habit_service.log_habit(
-            "hl-val", "h-val", "u-s5", "2026-07-20",
-            value=5.0, status="partial"
-        )
+        log_id = self.habit_service.log_habit("hl-val", "h-val", "u-s5", "2026-07-20", value=5.0, status="partial")
         self.assertEqual(log_id, "hl-val")
 
     def test_recovery_nonexistent_user(self):

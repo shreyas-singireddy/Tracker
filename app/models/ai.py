@@ -3,44 +3,49 @@
 All models are typed dataclasses.  They are serializable via to_dict() / from_dict()
 and contain NO business logic (validation and intelligence live in AICoachService).
 """
-from dataclasses import dataclass, asdict, field
-from typing import Any, Dict, List, Optional
-from enum import Enum
 
+from dataclasses import asdict, dataclass
+from enum import Enum
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Intent Classification
 # ---------------------------------------------------------------------------
 
+
 class IntentCategory(str, Enum):
     """Rule-based NLP intent categories understood by the AI Coach."""
-    NUTRITION_QUERY       = "nutrition_query"
-    WORKOUT_QUERY         = "workout_query"
-    RECOVERY_QUERY        = "recovery_query"
-    HABIT_QUERY           = "habit_query"
-    PROGRESS_QUERY        = "progress_query"
+
+    NUTRITION_QUERY = "nutrition_query"
+    WORKOUT_QUERY = "workout_query"
+    RECOVERY_QUERY = "recovery_query"
+    HABIT_QUERY = "habit_query"
+    PROGRESS_QUERY = "progress_query"
     GENERAL_FITNESS_QUERY = "general_fitness_query"
 
 
 class RecommendationPriority(str, Enum):
     """Priority tiers for AI recommendations."""
-    HIGH   = "high"
+
+    HIGH = "high"
     MEDIUM = "medium"
-    LOW    = "low"
+    LOW = "low"
 
 
 class RecommendationCategory(str, Enum):
     """Domain categories for recommendations."""
+
     NUTRITION = "nutrition"
-    WORKOUT   = "workout"
-    RECOVERY  = "recovery"
-    HABIT     = "habit"
-    GENERAL   = "general"
+    WORKOUT = "workout"
+    RECOVERY = "recovery"
+    HABIT = "habit"
+    GENERAL = "general"
 
 
 # ---------------------------------------------------------------------------
 # Persisted models (stored in ai_* tables)
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class AICoachSession:
@@ -48,19 +53,20 @@ class AICoachSession:
 
     Persisted in ai_sessions table.
     """
-    session_id:  str
-    user_id:     str
-    started_at:  Optional[str] = None
-    ended_at:    Optional[str] = None
-    query_count: int = 0
-    created_at:  Optional[str] = None
-    updated_at:  Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    session_id: str
+    user_id: str
+    started_at: str | None = None
+    ended_at: str | None = None
+    query_count: int = 0
+    created_at: str | None = None
+    updated_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AICoachSession":
+    def from_dict(cls, data: dict[str, Any]) -> "AICoachSession":
         return cls(
             session_id=data["session_id"],
             user_id=data["user_id"],
@@ -79,18 +85,19 @@ class AIQuery:
     Every query has a classified intent (resolved by the NLP engine) and is
     linked to an AICoachSession.  Persisted in ai_queries table.
     """
-    query_id:   str
-    session_id: str
-    user_id:    str
-    raw_text:   str
-    intent:     str   # IntentCategory value
-    created_at: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    query_id: str
+    session_id: str
+    user_id: str
+    raw_text: str
+    intent: str  # IntentCategory value
+    created_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AIQuery":
+    def from_dict(cls, data: dict[str, Any]) -> "AIQuery":
         return cls(
             query_id=data["query_id"],
             session_id=data["session_id"],
@@ -111,19 +118,20 @@ class AIResponse:
 
     Persisted in ai_responses table.
     """
-    response_id:  str
-    query_id:     str
-    user_id:      str
-    response_text: str
-    intent:       str   # mirrors the query's intent
-    rule_source:  str   # mandatory — e.g. "Rule: recovery_score < 40 → rest day"
-    created_at:   Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    response_id: str
+    query_id: str
+    user_id: str
+    response_text: str
+    intent: str  # mirrors the query's intent
+    rule_source: str  # mandatory — e.g. "Rule: recovery_score < 40 → rest day"
+    created_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AIResponse":
+    def from_dict(cls, data: dict[str, Any]) -> "AIResponse":
         return cls(
             response_id=data["response_id"],
             query_id=data["query_id"],
@@ -144,22 +152,23 @@ class Recommendation:
 
     Persisted in ai_recommendations table.
     """
-    recommendation_id: str
-    user_id:           str
-    category:          str   # RecommendationCategory value
-    title:             str
-    body:              str
-    rule_source:       str   # mandatory — references named rule constant
-    priority:          str = RecommendationPriority.MEDIUM.value
-    log_date:          Optional[str] = None   # date context used for generation
-    created_at:        Optional[str] = None
-    updated_at:        Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    recommendation_id: str
+    user_id: str
+    category: str  # RecommendationCategory value
+    title: str
+    body: str
+    rule_source: str  # mandatory — references named rule constant
+    priority: str = RecommendationPriority.MEDIUM.value
+    log_date: str | None = None  # date context used for generation
+    created_at: str | None = None
+    updated_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Recommendation":
+    def from_dict(cls, data: dict[str, Any]) -> "Recommendation":
         return cls(
             recommendation_id=data["recommendation_id"],
             user_id=data["user_id"],
@@ -178,6 +187,7 @@ class Recommendation:
 # In-memory rule registry (NOT persisted)
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class InsightRule:
     """Defines a single rule used by the AI recommendation engine.
@@ -185,10 +195,11 @@ class InsightRule:
     InsightRules live as code constants in AICoachService — they are NEVER
     stored in the database.  This keeps the logic auditable and version-controlled.
     """
-    rule_id:   str    # unique constant name, e.g. "RULE_LOW_RECOVERY"
-    category:  str    # RecommendationCategory value
-    condition: str    # human-readable description of the trigger condition
-    message:   str    # response message template
 
-    def to_dict(self) -> Dict[str, Any]:
+    rule_id: str  # unique constant name, e.g. "RULE_LOW_RECOVERY"
+    category: str  # RecommendationCategory value
+    condition: str  # human-readable description of the trigger condition
+    message: str  # response message template
+
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)

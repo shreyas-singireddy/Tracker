@@ -1,26 +1,27 @@
 import os
 import unittest
-from pathlib import Path
 from datetime import datetime, timedelta
+from pathlib import Path
+
+from app.core.exceptions import ValidationError
 from app.database.connection import DatabaseManager
 from app.database.migrations import MigrationRunner
-from app.models.analytics import FitnessScore, WeeklyReport, MonthlyReport, AnalyticsSnapshot, ProgressTrend
-from app.models.domain import User, BodyMeasurement
-from app.models.habit_recovery import Habit, SleepLog, RecoveryLog
-from app.models.workout import WorkoutSession
-from app.repositories.user import UserRepository
+from app.models.domain import User
+from app.models.habit_recovery import Habit
 from app.repositories.analytics import (
-    FitnessScoreRepository, ReportRepository,
-    AnalyticsSnapshotRepository, ProgressTrendRepository
+    AnalyticsSnapshotRepository,
+    FitnessScoreRepository,
+    ProgressTrendRepository,
+    ReportRepository,
 )
-from app.repositories.workout import WorkoutSessionRepository
 from app.repositories.body_measurement import BodyMeasurementRepository
-from app.repositories.nutrition import NutritionLogRepository
 from app.repositories.habit import HabitRepository
 from app.repositories.habit_log import HabitLogRepository
+from app.repositories.nutrition import NutritionLogRepository
 from app.repositories.recovery import RecoveryRepository
+from app.repositories.user import UserRepository
+from app.repositories.workout import WorkoutSessionRepository
 from app.services.analytics import AnalyticsService
-from app.core.exceptions import ValidationError
 
 TEST_DB_PATH = Path(__file__).resolve().parent / "test_fitos_s7.db"
 
@@ -32,8 +33,7 @@ class TestSprint7AnalyticsEngine(unittest.TestCase):
         self.db = DatabaseManager(db_path=str(TEST_DB_PATH))
 
         self.runner = MigrationRunner(
-            migrations_dir=Path(__file__).resolve().parent.parent / "app" / "database" / "migrations",
-            db=self.db
+            migrations_dir=Path(__file__).resolve().parent.parent / "app" / "database" / "migrations", db=self.db
         )
         self.runner.run_all()
 
@@ -63,16 +63,29 @@ class TestSprint7AnalyticsEngine(unittest.TestCase):
             habit_repo=self.habit_repo,
             habit_log_repo=self.habit_log_repo,
             recovery_repo=self.recovery_repo,
-            db=self.db
+            db=self.db,
         )
 
         # Clear all tables
         try:
-            for table in ["progress_trends", "analytics_snapshots", "monthly_reports",
-                          "weekly_reports", "fitness_scores", "recovery_logs",
-                          "habit_logs", "habits", "nutrition_logs", "exercise_sets",
-                          "exercise_logs", "workout_sessions", "body_measurements",
-                          "meal_entries", "meals", "users"]:
+            for table in [
+                "progress_trends",
+                "analytics_snapshots",
+                "monthly_reports",
+                "weekly_reports",
+                "fitness_scores",
+                "recovery_logs",
+                "habit_logs",
+                "habits",
+                "nutrition_logs",
+                "exercise_sets",
+                "exercise_logs",
+                "workout_sessions",
+                "body_measurements",
+                "meal_entries",
+                "meals",
+                "users",
+            ]:
                 self.db.execute_write(f"DELETE FROM {table};")
         except Exception:
             pass
@@ -110,19 +123,23 @@ class TestSprint7AnalyticsEngine(unittest.TestCase):
         """Verifies aggregation collects data from all modules."""
         # Create a recovery log via repo
         from app.models.habit_recovery import RecoveryLog as RL
-        rl = RL(recovery_log_id="rl-agg", user_id="u-s7", log_date="2026-07-15",
-                recovery_score=85.0, readiness_state="FULL")
+
+        rl = RL(
+            recovery_log_id="rl-agg", user_id="u-s7", log_date="2026-07-15", recovery_score=85.0, readiness_state="FULL"
+        )
         self.recovery_repo.create_recovery_log(rl)
 
         # Create a habit via repo
-        from app.models.habit_recovery import Habit
+
         h = Habit(habit_id="h-agg", user_id="u-s7", name="Drink Water")
         self.habit_repo.create_habit(h)
 
         # Log the habit as completed via repo
         from app.models.domain import HabitLog
-        hl = HabitLog(habit_log_id="hl-agg", habit_id="h-agg", user_id="u-s7",
-                      log_date="2026-07-15", status="completed")
+
+        hl = HabitLog(
+            habit_log_id="hl-agg", habit_id="h-agg", user_id="u-s7", log_date="2026-07-15", status="completed"
+        )
         self.habit_log_repo.create_habit_log(hl)
 
         agg = self.analytics_service.get_aggregated_day("u-s7", "2026-07-15")
@@ -158,14 +175,18 @@ class TestSprint7AnalyticsEngine(unittest.TestCase):
         """Verifies overall is weighted sum of sub-scores."""
         # Create good conditions via repos
         from app.models.habit_recovery import RecoveryLog as RL
-        rl = RL(recovery_log_id="rl-fs1", user_id="u-s7", log_date="2026-07-22",
-                recovery_score=90.0, readiness_state="FULL")
+
+        rl = RL(
+            recovery_log_id="rl-fs1", user_id="u-s7", log_date="2026-07-22", recovery_score=90.0, readiness_state="FULL"
+        )
         self.recovery_repo.create_recovery_log(rl)
 
         # Log nutrition via repo
         from app.models.nutrition import NutritionLog
-        nl = NutritionLog(log_id="nl-fs1", user_id="u-s7", log_date="2026-07-22",
-                          total_calories=2000.0, total_protein=130.0)
+
+        nl = NutritionLog(
+            log_id="nl-fs1", user_id="u-s7", log_date="2026-07-22", total_calories=2000.0, total_protein=130.0
+        )
         self.nutrition_log_repo.upsert_log(nl)
 
         score = self.analytics_service.compute_fitness_score("u-s7", "2026-07-22")
@@ -206,7 +227,7 @@ class TestSprint7AnalyticsEngine(unittest.TestCase):
             self.db.execute_write(
                 """INSERT INTO recovery_logs (recovery_log_id, user_id, log_date, recovery_score, readiness_state)
                    VALUES (?, ?, ?, ?, ?)""",
-                (f"rl-trend-{i}", "u-s7", day, score_val, "MODERATE")
+                (f"rl-trend-{i}", "u-s7", day, score_val, "MODERATE"),
             )
 
         trend = self.analytics_service.analyze_trends("u-s7", "recovery", days=7)
@@ -232,7 +253,7 @@ class TestSprint7AnalyticsEngine(unittest.TestCase):
             self.db.execute_write(
                 """INSERT INTO workout_sessions (session_id, user_id, plan_id, start_time, end_time, status, calories_burned_kcal)
                    VALUES (?, ?, NULL, ?, ?, 'COMPLETED', ?)""",
-                (f"ws-wr-{i}", "u-s7", f"{day} 10:00:00", f"{day} 11:00:00", 350.0)
+                (f"ws-wr-{i}", "u-s7", f"{day} 10:00:00", f"{day} 11:00:00", 350.0),
             )
 
         week_start = (today - timedelta(days=today.weekday())).strftime("%Y-%m-%d")
@@ -289,12 +310,12 @@ class TestSprint7AnalyticsEngine(unittest.TestCase):
         self.db.execute_write(
             """INSERT INTO body_measurements (measurement_id, user_id, weight_kg, logged_at)
                VALUES (?, ?, ?, ?)""",
-            ("bm-mr1", "u-s7", 82.0, "2026-07-01 08:00:00")
+            ("bm-mr1", "u-s7", 82.0, "2026-07-01 08:00:00"),
         )
         self.db.execute_write(
             """INSERT INTO body_measurements (measurement_id, user_id, weight_kg, logged_at)
                VALUES (?, ?, ?, ?)""",
-            ("bm-mr2", "u-s7", 80.5, "2026-07-31 08:00:00")
+            ("bm-mr2", "u-s7", 80.5, "2026-07-31 08:00:00"),
         )
 
         report = self.analytics_service.generate_monthly_report("u-s7", "2026-07-01")

@@ -1,16 +1,19 @@
 """FitOS Command Line Utility & Initializer Entrypoint."""
-import os
-import sys
+
 import argparse
+import os
 import subprocess
+import sys
+
 from app.core.bootloader import Bootloader
 from app.core.logging import logger
 from app.database.migrations import migration_runner
 
+
 def main():
     parser = argparse.ArgumentParser(description="FitOS Command Line Utility")
     parser.add_argument("--init-db", action="store_true", help="Initialize database and run schema migrations")
-    
+
     args = parser.parse_args()
 
     if args.init_db:
@@ -28,7 +31,7 @@ def main():
     try:
         Bootloader.boot()
     except Exception as e:
-        logger.critical(f"Critical error during boot initialization: {str(e)}")
+        logger.critical(f"Critical error during boot initialization: {e!s}")
         sys.exit(1)
 
     # Target path for Streamlit application
@@ -39,14 +42,15 @@ def main():
         subprocess.run(["streamlit", "run", ui_app_path], check=True)
     except FileNotFoundError:
         logger.error("Streamlit binary not found on the host system PATH.")
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("FitOS Database migration completed successfully.")
         print("To launch the UI, please ensure Streamlit is installed and run:")
         print(f"streamlit run {ui_app_path}")
-        print("="*50 + "\n")
+        print("=" * 50 + "\n")
     except subprocess.CalledProcessError as e:
         logger.error(f"Streamlit application terminated with exit code: {e.returncode}")
         sys.exit(e.returncode)
+
 
 if __name__ == "__main__":
     main()

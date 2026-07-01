@@ -2,21 +2,22 @@ import json
 import logging
 import sys
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
+
 from app.core.config import settings
 
 
 class JSONFormatter(logging.Formatter):
     """Custom JSON formatter for structured logging."""
-    
+
     def format(self, record: logging.LogRecord) -> str:
-        log_data: Dict[str, Any] = {
+        log_data: dict[str, Any] = {
             "timestamp": datetime.fromtimestamp(record.created).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
             "module": record.module,
-            "line": record.lineno
+            "line": record.lineno,
         }
         # Include exception info if available
         if record.exc_info:
@@ -27,23 +28,22 @@ class JSONFormatter(logging.Formatter):
 def configure_logger(name: str = "FitOS") -> logging.Logger:
     """Configures and returns a logger instance with file and console handlers."""
     logger = logging.getLogger(name)
-    
+
     # Avoid duplicate handlers if already configured
     if logger.hasHandlers():
         return logger
-        
+
     logger.setLevel(settings.LOG_LEVEL)
-    
+
     # Console Handler: human-readable format
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(settings.LOG_LEVEL)
     console_formatter = logging.Formatter(
-        fmt="%(asctime)s [%(levelname)s] %(name)s (%(module)s:%(lineno)d): %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        fmt="%(asctime)s [%(levelname)s] %(name)s (%(module)s:%(lineno)d): %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
-    
+
     # File Handler: structured JSON logs for backend analysis
     try:
         file_handler = logging.FileHandler(settings.LOG_FILE, encoding="utf-8")
@@ -52,8 +52,8 @@ def configure_logger(name: str = "FitOS") -> logging.Logger:
         logger.addHandler(file_handler)
     except Exception as e:
         # Fallback if log file cannot be created
-        logger.warning(f"Could not initialize file logging handler: {str(e)}")
-        
+        logger.warning(f"Could not initialize file logging handler: {e!s}")
+
     return logger
 
 

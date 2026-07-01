@@ -1,0 +1,50 @@
+# Git
+.git
+.gitattributes
+.gitignore
+.gitlab-ci.yml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+*.db
+*.db-shm
+*.db-wal
+
+# Environments
+.env
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Docs
+docs/
+
+# Tests (run in CI)
+tests/
+.pytest_cache/
+
+# Config
+*.toml
+*.cfg
+*.ini

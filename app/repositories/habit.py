@@ -1,6 +1,5 @@
-from typing import Optional, List
-from app.repositories.base import BaseRepository
 from app.models.habit_recovery import Habit
+from app.repositories.base import BaseRepository
 
 
 class HabitRepository(BaseRepository):
@@ -11,12 +10,12 @@ class HabitRepository(BaseRepository):
         self.create("habits", habit.to_dict())
         return habit.habit_id
 
-    def get_habit(self, habit_id: str) -> Optional[Habit]:
+    def get_habit(self, habit_id: str) -> Habit | None:
         """Fetches a Habit object by ID."""
         row = self.read("habits", "habit_id", habit_id)
         return Habit.from_dict(row) if row else None
 
-    def get_user_habits(self, user_id: str) -> List[Habit]:
+    def get_user_habits(self, user_id: str) -> list[Habit]:
         """Retrieves all habits configured for a specific user."""
         query = "SELECT * FROM habits WHERE user_id = ? ORDER BY created_at DESC;"
         rows = self.db.execute_read(query, (user_id,))

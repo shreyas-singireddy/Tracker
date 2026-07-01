@@ -1,9 +1,8 @@
-import re
 from pathlib import Path
-from typing import Optional
-from app.database.connection import DatabaseManager, db_manager
+
 from app.core.exceptions import DatabaseError
 from app.core.logging import logger
+from app.database.connection import DatabaseManager, db_manager
 
 MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
 
@@ -11,7 +10,7 @@ MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
 class MigrationRunner:
     """Discovers, tracks, and applies versioned SQL database migrations safely inside transactions."""
 
-    def __init__(self, migrations_dir: Path = MIGRATIONS_DIR, db: Optional[DatabaseManager] = None):
+    def __init__(self, migrations_dir: Path = MIGRATIONS_DIR, db: DatabaseManager | None = None):
         self.migrations_dir = migrations_dir
         self.db = db or db_manager
         logger.debug(f"MigrationRunner initialized with migrations directory: {self.migrations_dir}")
@@ -28,7 +27,7 @@ class MigrationRunner:
             self.db.execute_write(create_table_query)
             logger.debug("schema_migrations table verified/created.")
         except DatabaseError as e:
-            logger.error(f"Failed to initialize migration table: {str(e)}")
+            logger.error(f"Failed to initialize migration table: {e!s}")
             raise
 
     def get_applied_migrations(self) -> set:
@@ -38,7 +37,7 @@ class MigrationRunner:
             rows = self.db.execute_read(query)
             return {row["version"] for row in rows}
         except DatabaseError as e:
-            logger.error(f"Failed to fetch applied migrations: {str(e)}")
+            logger.error(f"Failed to fetch applied migrations: {e!s}")
             raise
 
     def get_migration_files(self) -> list:
@@ -46,7 +45,7 @@ class MigrationRunner:
         if not self.migrations_dir.exists():
             logger.warning(f"Migrations directory does not exist: {self.migrations_dir}")
             return []
-            
+
         sql_files = list(self.migrations_dir.glob("*.sql"))
         # Sort files numerically/alphabetically by filename
         sql_files.sort(key=lambda p: p.name)
@@ -56,9 +55,9 @@ class MigrationRunner:
         """Reads and executes a single SQL migration file inside a transaction."""
         filename = filepath.name
         logger.info(f"Applying migration: {filename}")
-        
+
         try:
-            with open(filepath, "r", encoding="utf-8") as f:
+            with filepath.open(encoding="utf-8") as f:
                 sql_content = f.read()
 
             # Split statements by semicolon if needed, or execute as a script.
@@ -69,25 +68,22 @@ class MigrationRunner:
                 # Run the migration SQL script
                 cursor.executescript(sql_content)
                 # Register applied migration in schema_migrations table
-                cursor.execute(
-                    "INSERT INTO schema_migrations (version) VALUES (?);", 
-                    (filename,)
-                )
+                cursor.execute("INSERT INTO schema_migrations (version) VALUES (?);", (filename,))
                 cursor.close()
-                
+
             logger.info(f"Successfully applied migration: {filename}")
         except Exception as e:
-            logger.error(f"Failed to apply migration {filename}: {str(e)}")
+            logger.error(f"Failed to apply migration {filename}: {e!s}")
             raise DatabaseError(f"Migration {filename} failed and was rolled back.", details=str(e))
 
     def run_all(self):
         """Executes the complete migration sequence, applying any outstanding updates."""
         logger.info("Starting database migration runner...")
         self.init_migration_table()
-        
+
         applied = self.get_applied_migrations()
         files = self.get_migration_files()
-        
+
         applied_count = 0
         for filepath in files:
             filename = filepath.name
@@ -96,7 +92,7 @@ class MigrationRunner:
                 applied_count += 1
             else:
                 logger.debug(f"Migration {filename} already applied. Skipping.")
-                
+
         if applied_count > 0:
             logger.info(f"Database migration completed. Applied {applied_count} migrations.")
         else:
@@ -105,4 +101,3 @@ class MigrationRunner:
 
 # Global runner instance
 migration_runner = MigrationRunner()
-

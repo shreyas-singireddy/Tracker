@@ -5,9 +5,9 @@ and ai_recommendations tables.  Zero business logic lives here.
 
 All classes inherit BaseRepository from Sprint 2.
 """
-from typing import List, Optional
-from app.repositories.base import BaseRepository
+
 from app.models.ai import AICoachSession, AIQuery, AIResponse, Recommendation
+from app.repositories.base import BaseRepository
 
 
 class AISessionRepository(BaseRepository):
@@ -21,12 +21,12 @@ class AISessionRepository(BaseRepository):
         self.create("ai_sessions", session.to_dict())
         return session.session_id
 
-    def get_session(self, session_id: str) -> Optional[AICoachSession]:
+    def get_session(self, session_id: str) -> AICoachSession | None:
         """Fetches a single session by primary key."""
         row = self.read("ai_sessions", "session_id", session_id)
         return AICoachSession.from_dict(row) if row else None
 
-    def get_user_sessions(self, user_id: str) -> List[AICoachSession]:
+    def get_user_sessions(self, user_id: str) -> list[AICoachSession]:
         """Returns all sessions for a user, newest first."""
         query = "SELECT * FROM ai_sessions WHERE user_id = ? ORDER BY created_at DESC;"
         rows = self.db.execute_read(query, (user_id,))
@@ -57,24 +57,24 @@ class AIQueryRepository(BaseRepository):
         self.create("ai_queries", ai_query.to_dict())
         return ai_query.query_id
 
-    def get_query(self, query_id: str) -> Optional[AIQuery]:
+    def get_query(self, query_id: str) -> AIQuery | None:
         """Fetches a single query by primary key."""
         row = self.read("ai_queries", "query_id", query_id)
         return AIQuery.from_dict(row) if row else None
 
-    def get_session_queries(self, session_id: str) -> List[AIQuery]:
+    def get_session_queries(self, session_id: str) -> list[AIQuery]:
         """Returns all queries within a session, chronological order."""
         query = "SELECT * FROM ai_queries WHERE session_id = ? ORDER BY created_at ASC;"
         rows = self.db.execute_read(query, (session_id,))
         return [AIQuery.from_dict(r) for r in rows]
 
-    def get_user_queries(self, user_id: str) -> List[AIQuery]:
+    def get_user_queries(self, user_id: str) -> list[AIQuery]:
         """Returns all queries for a user, newest first."""
         query = "SELECT * FROM ai_queries WHERE user_id = ? ORDER BY created_at DESC;"
         rows = self.db.execute_read(query, (user_id,))
         return [AIQuery.from_dict(r) for r in rows]
 
-    def get_queries_by_intent(self, user_id: str, intent: str) -> List[AIQuery]:
+    def get_queries_by_intent(self, user_id: str, intent: str) -> list[AIQuery]:
         """Returns all queries for a user with a specific intent classification."""
         query = "SELECT * FROM ai_queries WHERE user_id = ? AND intent = ? ORDER BY created_at DESC;"
         rows = self.db.execute_read(query, (user_id, intent))
@@ -97,18 +97,18 @@ class AIResponseRepository(BaseRepository):
         self.create("ai_responses", response.to_dict())
         return response.response_id
 
-    def get_response(self, response_id: str) -> Optional[AIResponse]:
+    def get_response(self, response_id: str) -> AIResponse | None:
         """Fetches a single response by primary key."""
         row = self.read("ai_responses", "response_id", response_id)
         return AIResponse.from_dict(row) if row else None
 
-    def get_response_for_query(self, query_id: str) -> Optional[AIResponse]:
+    def get_response_for_query(self, query_id: str) -> AIResponse | None:
         """Returns the response for a specific query (1-to-1 relationship)."""
         query = "SELECT * FROM ai_responses WHERE query_id = ? LIMIT 1;"
         row = self.db.execute_read_one(query, (query_id,))
         return AIResponse.from_dict(row) if row else None
 
-    def get_user_responses(self, user_id: str) -> List[AIResponse]:
+    def get_user_responses(self, user_id: str) -> list[AIResponse]:
         """Returns all responses for a user, newest first."""
         query = "SELECT * FROM ai_responses WHERE user_id = ? ORDER BY created_at DESC;"
         rows = self.db.execute_read(query, (user_id,))
@@ -131,27 +131,24 @@ class AIRecommendationRepository(BaseRepository):
         self.create("ai_recommendations", rec.to_dict())
         return rec.recommendation_id
 
-    def get_recommendation(self, recommendation_id: str) -> Optional[Recommendation]:
+    def get_recommendation(self, recommendation_id: str) -> Recommendation | None:
         """Fetches a single recommendation by primary key."""
         row = self.read("ai_recommendations", "recommendation_id", recommendation_id)
         return Recommendation.from_dict(row) if row else None
 
-    def get_user_recommendations(self, user_id: str) -> List[Recommendation]:
+    def get_user_recommendations(self, user_id: str) -> list[Recommendation]:
         """Returns all recommendations for a user, newest first."""
         query = "SELECT * FROM ai_recommendations WHERE user_id = ? ORDER BY created_at DESC;"
         rows = self.db.execute_read(query, (user_id,))
         return [Recommendation.from_dict(r) for r in rows]
 
-    def get_recommendations_by_category(self, user_id: str, category: str) -> List[Recommendation]:
+    def get_recommendations_by_category(self, user_id: str, category: str) -> list[Recommendation]:
         """Returns recommendations filtered by domain category."""
-        query = (
-            "SELECT * FROM ai_recommendations "
-            "WHERE user_id = ? AND category = ? ORDER BY created_at DESC;"
-        )
+        query = "SELECT * FROM ai_recommendations WHERE user_id = ? AND category = ? ORDER BY created_at DESC;"
         rows = self.db.execute_read(query, (user_id, category))
         return [Recommendation.from_dict(r) for r in rows]
 
-    def get_recommendations_by_date(self, user_id: str, log_date: str) -> List[Recommendation]:
+    def get_recommendations_by_date(self, user_id: str, log_date: str) -> list[Recommendation]:
         """Returns recommendations generated for a specific date context."""
         query = (
             "SELECT * FROM ai_recommendations "
@@ -160,12 +157,9 @@ class AIRecommendationRepository(BaseRepository):
         rows = self.db.execute_read(query, (user_id, log_date))
         return [Recommendation.from_dict(r) for r in rows]
 
-    def get_high_priority(self, user_id: str) -> List[Recommendation]:
+    def get_high_priority(self, user_id: str) -> list[Recommendation]:
         """Returns only high-priority recommendations for a user."""
-        query = (
-            "SELECT * FROM ai_recommendations "
-            "WHERE user_id = ? AND priority = 'high' ORDER BY created_at DESC;"
-        )
+        query = "SELECT * FROM ai_recommendations WHERE user_id = ? AND priority = 'high' ORDER BY created_at DESC;"
         rows = self.db.execute_read(query, (user_id,))
         return [Recommendation.from_dict(r) for r in rows]
 

@@ -1,18 +1,13 @@
 from datetime import datetime, timedelta
-from typing import Optional, List, Tuple
-from app.repositories.sleep import SleepRepository
-from app.repositories.recovery import RecoveryRepository, RecoveryProfileRepository
-from app.repositories.user import UserRepository
-from app.models.habit_recovery import SleepLog, RecoveryLog, RecoveryProfile, ReadinessState
-from app.core.exceptions import ValidationError, ServiceError
-from app.core.logging import logger
-from app.utils.validators import (
-    validate_sleep_hours,
-    validate_sleep_quality,
-    validate_recovery_score
-)
-from app.database.connection import DatabaseManager, db_manager
 
+from app.core.exceptions import ServiceError, ValidationError
+from app.core.logging import logger
+from app.database.connection import DatabaseManager, db_manager
+from app.models.habit_recovery import ReadinessState, RecoveryLog, RecoveryProfile, SleepLog
+from app.repositories.recovery import RecoveryProfileRepository, RecoveryRepository
+from app.repositories.sleep import SleepRepository
+from app.repositories.user import UserRepository
+from app.utils.validators import validate_recovery_score, validate_sleep_hours, validate_sleep_quality
 
 # Weight constants for recovery score formula
 SLEEP_QUALITY_WEIGHT = 0.40
@@ -29,11 +24,11 @@ class RecoveryService:
 
     def __init__(
         self,
-        sleep_repo: Optional[SleepRepository] = None,
-        recovery_repo: Optional[RecoveryRepository] = None,
-        profile_repo: Optional[RecoveryProfileRepository] = None,
-        user_repo: Optional[UserRepository] = None,
-        db: Optional[DatabaseManager] = None
+        sleep_repo: SleepRepository | None = None,
+        recovery_repo: RecoveryRepository | None = None,
+        profile_repo: RecoveryProfileRepository | None = None,
+        user_repo: UserRepository | None = None,
+        db: DatabaseManager | None = None,
     ):
         self.sleep_repo = sleep_repo or SleepRepository()
         self.recovery_repo = recovery_repo or RecoveryRepository()
@@ -43,14 +38,7 @@ class RecoveryService:
 
     # --- Sleep Logging ---
 
-    def log_sleep(
-        self,
-        sleep_log_id: str,
-        user_id: str,
-        log_date: str,
-        hours: float,
-        quality_score: float
-    ) -> str:
+    def log_sleep(self, sleep_log_id: str, user_id: str, log_date: str, hours: float, quality_score: float) -> str:
         """Validates and logs daily sleep data."""
         logger.info(f"Logging sleep for user {user_id} on {log_date}: {hours}h, quality {quality_score}")
 
@@ -67,24 +55,22 @@ class RecoveryService:
         if existing:
             raise ValidationError(
                 message="Sleep log already exists for this date. Use update instead.",
-                details=f"User: {user_id}, Date: {log_date}"
+                details=f"User: {user_id}, Date: {log_date}",
             )
 
         sleep_log = SleepLog(
-            sleep_log_id=sleep_log_id,
-            user_id=user_id,
-            log_date=log_date,
-            hours=hours,
-            quality_score=quality_score
+            sleep_log_id=sleep_log_id, user_id=user_id, log_date=log_date, hours=hours, quality_score=quality_score
         )
 
         try:
             return self.sleep_repo.create_sleep_log(sleep_log)
         except Exception as e:
-            logger.error(f"Failed to log sleep: {str(e)}")
+            logger.error(f"Failed to log sleep: {e!s}")
             raise ServiceError("Sleep logging failed.", details=str(e))
 
-    def get_sleep_logs(self, user_id: str, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[SleepLog]:
+    def get_sleep_logs(
+        self, user_id: str, start_date: str | None = None, end_date: str | None = None
+    ) -> list[SleepLog]:
         """Retrieves sleep logs for a user, optionally filtered by date range."""
         if start_date and end_date:
             return self.sleep_repo.get_sleep_logs_by_date_range(user_id, start_date, end_date)
@@ -100,10 +86,9 @@ class RecoveryService:
 
         # Create default profile
         import uuid
+
         profile = RecoveryProfile(
-            profile_id=str(uuid.uuid4()),
-            user_id=user_id,
-            baseline_sleep_hours=DEFAULT_BASELINE_SLEEP_HOURS
+            profile_id=str(uuid.uuid4()), user_id=user_id, baseline_sleep_hours=DEFAULT_BASELINE_SLEEP_HOURS
         )
         self.profile_repo.create_profile(profile)
         return profile
@@ -154,10 +139,10 @@ class RecoveryService:
 
         # --- Final Recovery Score ---
         recovery_score = (
-            (sleep_quality_component * SLEEP_QUALITY_WEIGHT) +
-            (sleep_duration_component * SLEEP_DURATION_WEIGHT) +
-            (workout_load_component * WORKOUT_LOAD_WEIGHT) +
-            (rest_days_component * REST_DAYS_WEIGHT)
+            (sleep_quality_component * SLEEP_QUALITY_WEIGHT)
+            + (sleep_duration_component * SLEEP_DURATION_WEIGHT)
+            + (workout_load_component * WORKOUT_LOAD_WEIGHT)
+            + (rest_days_component * REST_DAYS_WEIGHT)
         )
         recovery_score = round(max(0.0, min(100.0, recovery_score)), 2)
 
@@ -182,7 +167,7 @@ class RecoveryService:
             sleep_quality_component=round(sleep_quality_component, 2),
             sleep_duration_component=round(sleep_duration_component, 2),
             workout_load_component=round(workout_load_component, 2),
-            rest_days_component=round(rest_days_component, 2)
+            rest_days_component=round(rest_days_component, 2),
         )
 
         try:
@@ -191,7 +176,7 @@ class RecoveryService:
             else:
                 self.recovery_repo.create_recovery_log(recovery_log)
         except Exception as e:
-            logger.error(f"Failed to save recovery log: {str(e)}")
+            logger.error(f"Failed to save recovery log: {e!s}")
             raise ServiceError("Recovery calculation failed.", details=str(e))
 
         return recovery_log
@@ -232,9 +217,9 @@ class RecoveryService:
             # Scale: 0 sessions = 100, 1 session = 70, 2 sessions = 40, 3+ sessions = 20
             if session_count >= 3:
                 return 20.0
-            elif session_count == 2:
+            if session_count == 2:
                 return 40.0
-            elif session_count == 1:
+            if session_count == 1:
                 # Adjust by calories: high calories (>500) = lower recovery
                 if total_calories > 500:
                     return 50.0
@@ -242,7 +227,7 @@ class RecoveryService:
             return 100.0
 
         except Exception as e:
-            logger.warning(f"Failed to compute workout load component: {str(e)}")
+            logger.warning(f"Failed to compute workout load component: {e!s}")
             return 100.0  # Default to full recovery contribution on error
 
     def _compute_rest_days_component(self, user_id: str, log_date: str) -> float:
@@ -289,13 +274,13 @@ class RecoveryService:
             return 100.0
 
         except Exception as e:
-            logger.warning(f"Failed to compute rest days component: {str(e)}")
+            logger.warning(f"Failed to compute rest days component: {e!s}")
             return 50.0  # Default to moderate rest on error
 
-    def get_recovery(self, user_id: str, log_date: str) -> Optional[RecoveryLog]:
+    def get_recovery(self, user_id: str, log_date: str) -> RecoveryLog | None:
         """Retrieves the recovery log for a user on a specific date."""
         return self.recovery_repo.get_recovery_log_by_date(user_id, log_date)
 
-    def get_recovery_history(self, user_id: str, start_date: str, end_date: str) -> List[RecoveryLog]:
+    def get_recovery_history(self, user_id: str, start_date: str, end_date: str) -> list[RecoveryLog]:
         """Retrieves recovery history for a user within a date range."""
         return self.recovery_repo.get_recovery_logs_by_date_range(user_id, start_date, end_date)

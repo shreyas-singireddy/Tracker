@@ -5,8 +5,8 @@ Performs DB migration before launching the Streamlit UI.
 """
 
 import os
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -23,6 +23,7 @@ def main():
     print("\n[1/2] Booting FitOS System (migrations, modules registry)...")
     try:
         from app.core.bootloader import Bootloader
+
         Bootloader.boot()
         print("  ✓ System successfully booted.")
     except Exception as e:
@@ -32,7 +33,7 @@ def main():
     # Step 2: Launch Streamlit UI
     print("\n[2/2] Launching FitOS Streamlit UI...")
     ui_path = project_root / "app" / "ui" / "app.py"
-    
+
     if not ui_path.exists():
         print(f"  ✗ UI file not found: {ui_path}")
         sys.exit(1)

@@ -3,7 +3,9 @@
 Verifies that all frontend components and page render entrypoints can be
 successfully imported and loaded without syntax errors or broken dependencies.
 """
+
 import unittest
+
 
 class TestSprint8UI(unittest.TestCase):
     """Verifies that all UI page render entrypoints are structurally sound."""
@@ -12,16 +14,17 @@ class TestSprint8UI(unittest.TestCase):
         """Verifies that all UI files import without raising any errors."""
         try:
             from app.ui.pages import (
-                dashboard,
-                workout,
-                nutrition,
-                habits,
-                recovery,
                 ai_coach,
                 analytics,
+                dashboard,
+                habits,
+                nutrition,
+                recovery,
                 reports,
-                settings
+                settings,
+                workout,
             )
+
             # Assert render attributes exist
             self.assertTrue(callable(dashboard.render))
             self.assertTrue(callable(workout.render))
@@ -39,6 +42,7 @@ class TestSprint8UI(unittest.TestCase):
         """Verifies that the main app.py file can be imported without instant side-effects."""
         try:
             import app.ui.app as ui_app
+
             self.assertTrue(callable(ui_app.run_app))
             self.assertTrue(callable(ui_app.check_db_health))
         except Exception as e:

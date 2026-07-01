@@ -1,6 +1,5 @@
-from typing import Optional
-from app.repositories.base import BaseRepository
 from app.models.domain import User, UserProfile
+from app.repositories.base import BaseRepository
 
 
 class UserRepository(BaseRepository):
@@ -11,7 +10,7 @@ class UserRepository(BaseRepository):
         self.create("users", user.to_dict())
         return user.user_id
 
-    def get_user(self, user_id: str) -> Optional[User]:
+    def get_user(self, user_id: str) -> User | None:
         """Fetches a User object by its user_id."""
         row = self.read("users", "user_id", user_id)
         return User.from_dict(row) if row else None
@@ -33,7 +32,7 @@ class UserProfileRepository(BaseRepository):
         self.create("user_profiles", profile.to_dict())
         return profile.user_id
 
-    def get_profile(self, user_id: str) -> Optional[UserProfile]:
+    def get_profile(self, user_id: str) -> UserProfile | None:
         """Fetches a UserProfile object by user_id."""
         row = self.read("user_profiles", "user_id", user_id)
         return UserProfile.from_dict(row) if row else None

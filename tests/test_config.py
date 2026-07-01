@@ -1,6 +1,7 @@
 import os
 import unittest
 from unittest.mock import patch
+
 from app.core.config import Settings
 from app.core.exceptions import ConfigurationError
 

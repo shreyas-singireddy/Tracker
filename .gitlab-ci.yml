@@ -1,13 +1,22 @@
 stages:
+  - format
+  - lint
+  - type_check
   - test
+  - coverage
+  - security
+  - build
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PRE_COMMIT_HOME: "$CI_PROJECT_DIR/.cache/pre-commit"
 
 cache:
+  key: "$CI_COMMIT_REF_SLUG"
   paths:
     - .cache/pip
-    - venv/
+    - .cache/pre-commit
+    - .venv/
 
 before_script:
   - python --version
@@ -15,20 +24,133 @@ before_script:
   - source venv/bin/activate || venv\Scripts\activate
   - pip install --upgrade pip
   - pip install -r requirements.txt
+  - pip install ruff mypy flake8 pylint vulture bandit pre-commit pyupgrade pytest pytest-cov
 
-run-diagnostics-and-tests:
+format:
+  stage: format
+  image: python:3.11-slim
+  script:
+    - source venv/bin/activate || venv\Scripts\activate
+    - ruff format --check .
+  only:
+    - merge_requests
+    - main
+    - master
+
+lint-ruff:
+  stage: lint
+  image: python:3.11-slim
+  script:
+    - source venv/bin/activate || venv\Scripts\activate
+    - ruff check .
+  only:
+    - merge_requests
+    - main
+    - master
+
+lint-flake8:
+  stage: lint
+  image: python:3.11-slim
+  script:
+    - source venv/bin/activate || venv\Scripts\activate
+    - flake8 app/
+  only:
+    - merge_requests
+    - main
+    - master
+
+lint-pylint:
+  stage: lint
+  image: python:3.11-slim
+  script:
+    - source venv/bin/activate || venv\Scripts\activate
+    - pylint app/ || true
+  allow_failure: true
+  only:
+    - merge_requests
+    - main
+    - master
+
+type-check:
+  stage: type_check
+  image: python:3.11-slim
+  script:
+    - source venv/bin/activate || venv\Scripts\activate
+    - mypy app/ --ignore-missing-imports
+  only:
+    - merge_requests
+    - main
+    - master
+
+test:
   stage: test
   image: python:3.11-slim
   script:
-    # 1. Initialize Database Schema
+    - source venv/bin/activate || venv\Scripts\activate
     - python main.py --init-db
-    
-    # 2. Run FitOS Diagnostics Check
     - python scripts/health_check.py
-    
-    # 3. Run entire test suite
-    - pytest tests/ --import-mode=importlib
+    - pytest tests/ -v --import-mode=importlib --tb=short
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml
+    paths:
+      - test_fitos_*.db
   only:
     - merge_requests
+    - main
+    - master
+
+coverage:
+  stage: coverage
+  image: python:3.11-slim
+  script:
+    - source venv/bin/activate || venv\Scripts\activate
+    - pytest tests/ --cov=app --cov-report=term-missing --cov-report=xml --cov-report=html --import-mode=importlib
+    - coverage xml
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - htmlcov/
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+  only:
+    - merge_requests
+    - main
+    - master
+
+security-bandit:
+  stage: security
+  image: python:3.11-slim
+  script:
+    - source venv/bin/activate || venv\Scripts\activate
+    - bandit -r app/ -c pyproject.toml
+  only:
+    - merge_requests
+    - main
+    - master
+
+security-vulture:
+  stage: security
+  image: python:3.11-slim
+  script:
+    - source venv/bin/activate || venv\Scripts\activate
+    - vulture app/ main.py run_app.py run_tests.py scripts/ --exclude ".venv,tests,__pycache__"
+  only:
+    - merge_requests
+    - main
+    - master
+
+build-docker:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker build -t fitos:latest .
+  only:
     - main
     - master

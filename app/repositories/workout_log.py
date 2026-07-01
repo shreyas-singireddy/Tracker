@@ -1,6 +1,5 @@
-from typing import Optional, List
-from app.repositories.base import BaseRepository
 from app.models.domain import WorkoutLog
+from app.repositories.base import BaseRepository
 
 
 class WorkoutLogRepository(BaseRepository):
@@ -11,12 +10,12 @@ class WorkoutLogRepository(BaseRepository):
         self.create("workout_logs", log.to_dict())
         return log.log_id
 
-    def get_workout_log(self, log_id: str) -> Optional[WorkoutLog]:
+    def get_workout_log(self, log_id: str) -> WorkoutLog | None:
         """Fetches a WorkoutLog object by its log_id."""
         row = self.read("workout_logs", "log_id", log_id)
         return WorkoutLog.from_dict(row) if row else None
 
-    def get_user_workout_logs(self, user_id: str) -> List[WorkoutLog]:
+    def get_user_workout_logs(self, user_id: str) -> list[WorkoutLog]:
         """Retrieves all workout logs registered to a specific user."""
         query = "SELECT * FROM workout_logs WHERE user_id = ? ORDER BY logged_at DESC;"
         rows = self.db.execute_read(query, (user_id,))

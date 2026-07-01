@@ -1,12 +1,2 @@
 # UI Pages package exports
-from app.ui.pages import (
-    dashboard,
-    workout,
-    nutrition,
-    habits,
-    recovery,
-    ai_coach,
-    analytics,
-    reports,
-    settings
-)
+from app.ui.pages import ai_coach, analytics, dashboard, habits, nutrition, recovery, reports, settings, workout

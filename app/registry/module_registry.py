@@ -6,14 +6,17 @@ Provides:
 - DependencyGraph: topological sorter & circular dependency detector
 """
 
-from typing import Dict, List, Any, Optional
-from app.modules.base import BaseModule
-from app.core.logging import logger
+from typing import Any
+
 from app.core.exceptions import ValidationError
+from app.core.logging import logger
+from app.modules.base import BaseModule
+
 
 class ServiceRegistry:
     """Registry class for globally registering and looking up service instances."""
-    _services: Dict[str, Any] = {}
+
+    _services: dict[str, Any] = {}
 
     @classmethod
     def register(cls, name: str, service: Any) -> None:
@@ -34,7 +37,7 @@ class ServiceRegistry:
 class DependencyGraph:
     """Graph structure to validate dependencies and resolve load ordering."""
 
-    def __init__(self, adj_list: Dict[str, List[str]]):
+    def __init__(self, adj_list: dict[str, list[str]]):
         self.adj_list = adj_list
 
     def detect_circular_dependencies(self) -> bool:
@@ -45,14 +48,14 @@ class DependencyGraph:
         def dfs(node: str) -> bool:
             visited.add(node)
             rec_stack.add(node)
-            
+
             for neighbor in self.adj_list.get(node, []):
                 if neighbor not in visited:
                     if dfs(neighbor):
                         return True
                 elif neighbor in rec_stack:
                     return True
-                    
+
             rec_stack.remove(node)
             return False
 
@@ -62,7 +65,7 @@ class DependencyGraph:
                     return True
         return False
 
-    def get_load_order(self) -> List[str]:
+    def get_load_order(self) -> list[str]:
         """Performs topological sort to determine correct load order of modules."""
         if self.detect_circular_dependencies():
             raise ValidationError("Circular dependency detected in system modules graph!")
@@ -88,20 +91,20 @@ class ModuleRegistry:
     """Central registry handling registration, initialization, and lifecycle monitoring of modules."""
 
     def __init__(self):
-        self._modules: Dict[str, BaseModule] = {}
-        self._dependencies: Dict[str, List[str]] = {}
+        self._modules: dict[str, BaseModule] = {}
+        self._dependencies: dict[str, list[str]] = {}
         self._initialized = False
 
-    def register(self, name: str, module: BaseModule, dependencies: Optional[List[str]] = None) -> None:
+    def register(self, name: str, module: BaseModule, dependencies: list[str] | None = None) -> None:
         """Registers a module and its associated dependencies."""
         if name in self._modules:
             raise ValidationError(f"Module '{name}' is already registered.")
-        
+
         self._modules[name] = module
         self._dependencies[name] = dependencies or []
         logger.info(f"REGISTRY: Module '{name}' registered successfully.")
 
-    def initialize_all(self) -> List[str]:
+    def initialize_all(self) -> list[str]:
         """Resolves dependencies, checks cycles, and initializes modules in sorted order."""
         if self._initialized:
             logger.warning("REGISTRY: Modules already initialized.")
@@ -111,9 +114,7 @@ class ModuleRegistry:
         for name, deps in self._dependencies.items():
             for dep in deps:
                 if dep not in self._modules:
-                    raise ValidationError(
-                        f"Module '{name}' depends on unregistered module '{dep}'!"
-                    )
+                    raise ValidationError(f"Module '{name}' depends on unregistered module '{dep}'!")
 
         # Topological sorting
         graph = DependencyGraph(self._dependencies)
@@ -125,11 +126,11 @@ class ModuleRegistry:
             logger.info(f"REGISTRY: Initializing module '{name}'...")
             module = self._modules[name]
             module.init()
-            
+
             # Register module services globally
             for s_name, s_instance in module.get_services().items():
                 ServiceRegistry.register(s_name, s_instance)
-                
+
         self._initialized = True
         logger.info("REGISTRY: All modules initialized successfully.")
         return load_order
@@ -139,10 +140,10 @@ class ModuleRegistry:
             raise KeyError(f"Module '{name}' not found.")
         return self._modules[name]
 
-    def get_all_modules(self) -> Dict[str, BaseModule]:
+    def get_all_modules(self) -> dict[str, BaseModule]:
         return self._modules
 
-    def health_check_all(self) -> Dict[str, Any]:
+    def health_check_all(self) -> dict[str, Any]:
         """Aggregates health checks from all registered modules."""
         status = "GREEN"
         checks = {}
@@ -156,7 +157,7 @@ class ModuleRegistry:
                 elif res.get("status") == "YELLOW" and status != "RED":
                     status = "YELLOW"
             except Exception as e:
-                checks[name] = {"status": "RED", "details": f"Health check threw exception: {str(e)}"}
+                checks[name] = {"status": "RED", "details": f"Health check threw exception: {e!s}"}
                 status = "RED"
 
         return {"status": status, "modules": checks}

@@ -1,0 +1,227 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fitos"
+version = "1.0.0"
+description = "Offline AI Fitness Operating System — edge-first fitness tracking and coaching platform"
+readme = "README.md"
+license = { text = "AGPL-3.0-only" }
+authors = [
+    { name = "FitOS Contributors" },
+]
+requires-python = ">=3.11"
+keywords = ["fitness", "offline", "ai", "coach", "streamlit"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Healthcare Industry",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+
+dependencies = [
+    "streamlit>=1.38.0,<2",
+    "pandas>=2.2.3,<3",
+    "python-dateutil>=2.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0.0",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.9.0",
+    "mypy>=1.13.0",
+    "flake8>=7.0.0",
+    "pylint>=3.0.0",
+    "vulture>=2.10",
+    "bandit>=1.7.0",
+    "semgrep>=1.50.0",
+    "pip-audit>=2.7.0",
+    "pre-commit>=4.0.0",
+    "pyupgrade>=3.0.0",
+]
+test = [
+    "pytest>=9.0.0",
+    "pytest-cov>=7.0.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "N", "UP", "B", "A",
+    "C4", "SIM", "PL", "PTH", "ARG",
+    "RUF", "PIE", "T20", "RET", "SLF", "PYI",
+]
+ignore = [
+    "E501",
+    "PLR2004",
+    "PLR0913",
+    "PLR0915",
+    "PLR0912",
+    "PLR0911",
+    "PLW2901",
+    "S101",
+    "SIM117",
+    "B904",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/*.py" = ["T201", "E402"]
+"main.py" = ["T201", "PTH118"]
+"run_app.py" = ["T201"]
+"run_tests.py" = ["T201", "PLW1510"]
+"__init__.py" = ["F401"]
+"app/ui/app.py" = ["E402", "PTH123"]
+"app/ui/pages/workout.py" = ["RUF001", "RUF002", "RUF003"]
+"app/ui/pages/*.py" = ["E741"]
+"app/ui/pages/ai_coach.py" = ["RUF001"]
+"app/ui/pages/settings.py" = ["RUF001"]
+"app/utils/performance.py" = ["RUF013"]
+"app/utils/validators.py" = ["RET504"]
+"app/services/habit.py" = ["C401"]
+"app/services/recovery.py" = ["RUF003"]
+"app/services/analytics.py" = ["E741", "ARG002"]
+"app/registry/module_registry.py" = ["RUF012", "SIM102"]
+"app/repositories/base.py" = ["SIM118", "RUF005"]
+"tests/*.py" = ["PTH107", "SIM105", "PLR1714", "N817", "F841"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+ignore_missing_imports = true
+disallow_untyped_defs = false
+disallow_any_unimported = false
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+no_implicit_optional = true
+check_untyped_defs = false
+exclude = [
+    ".venv/",
+    "build/",
+    "tests/",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "streamlit",
+    "pandas",
+    "dateutil.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--tb=short",
+    "--strict-markers",
+    "--strict-config",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/ui/*",
+    "*/pages/*",
+    "*/modules/*",
+    "*/registry/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "pass",
+    "def __str__",
+]
+
+[tool.vulture]
+exclude = [".venv/", "build/", "tests/"]
+paths = ["app/", "main.py", "run_app.py", "run_tests.py", "scripts/"]
+
+[tool.bandit]
+exclude_dirs = [".venv", "tests", "build", "htmlcov"]
+skips = ["B101", "B311", "B403", "B404", "B603"]
+
+[tool.pylint]
+max-line-length = 120
+disable = [
+    "C0114", "C0115", "C0116",
+    "R0903", "R0902", "R0913", "R0915",
+    "R0801", "R1705", "R1728",
+    "W0718", "W0719",
+    "E0401", "E0611",
+    "W0212",
+    "C0103",
+    "C0301",
+]
+jobs = 0
+extension-pkg-whitelist = ["streamlit", "pandas"]
+
+[tool.pylint.basic]
+good-names = ["db", "st", "e", "i", "j", "k", "v", "f", "fn", "pk", "id", "ok"]
+
+[tool.pylint.design]
+max-attributes = 20
+max-args = 15
+max-locals = 25
+
+[tool.semgrep]
+config = ["p/bandit", "p/python", "p/flask"]
+
+[tool.flake8]
+max-line-length = 120
+extend-ignore = [
+    "E203", "E266", "E501", "W503",
+    "F401", "F403", "F811",
+    "F841",
+]
+exclude = [".venv", "build", "htmlcov", "tests"]
+per-file-ignores = [
+    "__init__.py: F401",
+    "app/__init__.py: F401",
+    "app/core/__init__.py: F401",
+    "app/models/__init__.py: F401",
+    "app/modules/__init__.py: F401",
+    "app/registry/__init__.py: F401",
+    "app/repositories/__init__.py: F401",
+    "app/services/__init__.py: F401",
+    "app/ui/__init__.py: F401",
+    "app/ui/pages/__init__.py: F401",
+    "app/database/__init__.py: F401",
+    "app/utils/__init__.py: F401",
+    "tests/__init__.py: F401",
+]
+
+[tool.gitleaks]
+# Gitleaks configuration is in .gitleaks.toml

@@ -1,20 +1,24 @@
-import streamlit as st
 import uuid
-from datetime import datetime
-from app.services.habit import HabitService
+
+import streamlit as st
+
 from app.models.habit_recovery import Habit
-from app.models.domain import HabitLog
+from app.services.habit import HabitService
+
 
 def render():
     user_id = st.session_state.current_user_id
     selected_date = st.session_state.selected_date
 
-    st.markdown("""
+    st.markdown(
+        """
         <div style='margin-bottom: 24px;'>
             <h1 class='gradient-text' style='font-size: 2.2rem; margin-bottom: 4px;'>Habits Tracking</h1>
             <p style='color: #94a3b8; font-size: 0.95rem; margin: 0;'>Track routines, streaks, and measure overall habit consistency.</p>
         </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
     if not user_id:
         st.info("💡 Please select or create an active profile in Settings to load habit logs.")
@@ -28,7 +32,7 @@ def render():
     # --- TAB 1: Daily Checklist ---
     with tab_checklist:
         st.subheader(f"Checklist for {selected_date}")
-        
+
         if habits:
             for h in habits:
                 # Find log for this date if exists
@@ -40,21 +44,24 @@ def render():
                         break
 
                 status = current_log.status if current_log else "Not Logged"
-                
+
                 # Render Habit Card
-                st.markdown(f"""
+                st.markdown(
+                    f"""
                     <div class='glass-card'>
                         <h4 style='margin:0; color:#5E6AD2;'>{h.name}</h4>
-                        <p style='margin:0; font-size:0.85rem; color:#94a3b8;'>{h.description or 'No description'}</p>
+                        <p style='margin:0; font-size:0.85rem; color:#94a3b8;'>{h.description or "No description"}</p>
                         <p style='margin:4px 0 0 0; font-size:0.85rem; color:#A5B4FC;'>
                             Target: {h.target_value:.1f} {h.unit} | Status: <b>{status.upper()}</b>
                         </p>
                     </div>
-                """, unsafe_allow_html=True)
+                """,
+                    unsafe_allow_html=True,
+                )
 
                 # Log actions
                 col_c, col_m, col_p = st.columns(3)
-                
+
                 if col_c.button("✓ Completed", key=f"comp_{h.habit_id}"):
                     try:
                         log_id = f"hl-{uuid.uuid4().hex[:8]}"
@@ -83,7 +90,9 @@ def render():
                         log_id = f"hl-{uuid.uuid4().hex[:8]}"
                         if current_log:
                             habit_service.habit_log_repo.delete_habit_log(current_log.habit_log_id)
-                        habit_service.log_habit(log_id, h.habit_id, user_id, selected_date, h.target_value / 2, "partial")
+                        habit_service.log_habit(
+                            log_id, h.habit_id, user_id, selected_date, h.target_value / 2, "partial"
+                        )
                         st.success(f"Logged '{h.name}' as partial progress.")
                         st.rerun()
                     except Exception as e:
@@ -99,8 +108,9 @@ def render():
             for h in habits:
                 streak = habit_service.compute_streak(h.habit_id, user_id)
                 consistency = habit_service.compute_consistency_score(h.habit_id, user_id, days=30)
-                
-                st.markdown(f"""
+
+                st.markdown(
+                    f"""
                     <div class='glass-card'>
                         <h4 style='margin:0; color:#818CF8;'>{h.name}</h4>
                         <div style='display:flex; gap:30px; margin-top:8px;'>
@@ -114,8 +124,10 @@ def render():
                             </div>
                         </div>
                     </div>
-                """, unsafe_allow_html=True)
-                
+                """,
+                    unsafe_allow_html=True,
+                )
+
                 # Delete habit button
                 if st.button("Delete Habit", key=f"del_h_{h.habit_id}"):
                     try:
@@ -135,7 +147,7 @@ def render():
             h_freq = st.selectbox("Frequency", ["daily", "weekly"])
             h_target = st.number_input("Target Value", min_value=0.1, value=1.0)
             h_unit = st.text_input("Unit (e.g. cups, minutes, times)", value="times")
-            
+
             h_submit = st.form_submit_button("Register Habit")
             if h_submit:
                 try:
@@ -146,7 +158,7 @@ def render():
                         description=h_desc,
                         frequency=h_freq,
                         target_value=h_target,
-                        unit=h_unit
+                        unit=h_unit,
                     )
                     habit_service.create_habit(new_habit)
                     st.success(f"Habit '{h_name}' registered successfully!")

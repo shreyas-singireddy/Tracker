@@ -7,7 +7,7 @@ This is the ONLY intelligent layer in FitOS.  It coordinates:
        - Tie-breaking defaults to general_fitness_query
 
     B. Context Engine
-       - Reads Sprint 3–5 data (read-only, never writes to those tables)
+       - Reads Sprint 3-5 data (read-only, never writes to those tables)
        - Produces a unified UserContext snapshot dict
 
     C. Recommendation Engine (Deterministic Rules Only)
@@ -22,44 +22,43 @@ This is the ONLY intelligent layer in FitOS.  It coordinates:
        - Persists sessions, queries, responses, recommendations via AI repositories
 
 CRITICAL BUSINESS RULES:
-    - AI NEVER modifies data in Sprint 3–5 tables
+    - AI NEVER modifies data in Sprint 3-5 tables
     - Every AIResponse.rule_source MUST be non-empty
     - Every Recommendation.rule_source MUST be non-empty
     - No ML, no LLM, no external APIs
 """
 
-from datetime import datetime, timedelta, date as date_type
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime, timedelta
+from typing import Any
 
+from app.core.exceptions import ServiceError, ValidationError
+from app.core.logging import logger
+from app.database.connection import DatabaseManager, db_manager
 from app.models.ai import (
-    IntentCategory,
-    RecommendationCategory,
-    RecommendationPriority,
     AICoachSession,
     AIQuery,
     AIResponse,
-    Recommendation,
     InsightRule,
+    IntentCategory,
+    Recommendation,
+    RecommendationCategory,
+    RecommendationPriority,
 )
 from app.repositories.ai import (
-    AISessionRepository,
     AIQueryRepository,
-    AIResponseRepository,
     AIRecommendationRepository,
+    AIResponseRepository,
+    AISessionRepository,
 )
-from app.repositories.user import UserRepository
+from app.repositories.body_measurement import BodyMeasurementRepository
 from app.repositories.food import FoodRepository
-from app.repositories.nutrition import MealRepository, MealEntryRepository, NutritionLogRepository
-from app.repositories.recovery import RecoveryRepository
-from app.repositories.sleep import SleepRepository
 from app.repositories.habit import HabitRepository
 from app.repositories.habit_log import HabitLogRepository
+from app.repositories.nutrition import MealEntryRepository, MealRepository, NutritionLogRepository
+from app.repositories.recovery import RecoveryRepository
+from app.repositories.sleep import SleepRepository
+from app.repositories.user import UserRepository
 from app.repositories.workout import WorkoutSessionRepository
-from app.repositories.body_measurement import BodyMeasurementRepository
-from app.core.exceptions import ValidationError, ServiceError
-from app.core.logging import logger
-from app.database.connection import DatabaseManager, db_manager
-
 
 # ---------------------------------------------------------------------------
 # Rule constants — every rule has a unique ID and a human-readable condition
@@ -129,33 +128,114 @@ RULE_FULL_CONTEXT_POSITIVE = InsightRule(
 )
 
 # Intent keyword map: category → list of trigger keywords (all lowercase)
-INTENT_KEYWORDS: Dict[str, List[str]] = {
+INTENT_KEYWORDS: dict[str, list[str]] = {
     IntentCategory.NUTRITION_QUERY.value: [
-        "eat", "eating", "food", "calorie", "calories", "protein", "carb", "carbs",
-        "fat", "fats", "meal", "diet", "macro", "macros", "nutrition", "intake",
-        "deficit", "surplus", "hungry", "snack", "supplement",
+        "eat",
+        "eating",
+        "food",
+        "calorie",
+        "calories",
+        "protein",
+        "carb",
+        "carbs",
+        "fat",
+        "fats",
+        "meal",
+        "diet",
+        "macro",
+        "macros",
+        "nutrition",
+        "intake",
+        "deficit",
+        "surplus",
+        "hungry",
+        "snack",
+        "supplement",
     ],
     IntentCategory.WORKOUT_QUERY.value: [
-        "exercise", "workout", "workouts", "train", "training", "lift", "lifting",
-        "run", "running", "strength", "session", "sessions", "sets", "reps",
-        "gym", "cardio", "muscle", "push", "pull", "legs", "plan",
+        "exercise",
+        "workout",
+        "workouts",
+        "train",
+        "training",
+        "lift",
+        "lifting",
+        "run",
+        "running",
+        "strength",
+        "session",
+        "sessions",
+        "sets",
+        "reps",
+        "gym",
+        "cardio",
+        "muscle",
+        "push",
+        "pull",
+        "legs",
+        "plan",
     ],
     IntentCategory.RECOVERY_QUERY.value: [
-        "sleep", "sleeping", "recover", "recovery", "rest", "fatigue",
-        "sore", "soreness", "readiness", "tired", "exhausted", "ache",
+        "sleep",
+        "sleeping",
+        "recover",
+        "recovery",
+        "rest",
+        "fatigue",
+        "sore",
+        "soreness",
+        "readiness",
+        "tired",
+        "exhausted",
+        "ache",
     ],
     IntentCategory.HABIT_QUERY.value: [
-        "habit", "habits", "streak", "streaks", "consistency", "routine",
-        "daily", "missed", "tracked", "completed", "log", "logging",
+        "habit",
+        "habits",
+        "streak",
+        "streaks",
+        "consistency",
+        "routine",
+        "daily",
+        "missed",
+        "tracked",
+        "completed",
+        "log",
+        "logging",
     ],
     IntentCategory.PROGRESS_QUERY.value: [
-        "progress", "weight", "goal", "goals", "trend", "improve",
-        "improvement", "result", "results", "measure", "measurement",
-        "body", "performance", "gain", "gains", "pr", "record",
+        "progress",
+        "weight",
+        "goal",
+        "goals",
+        "trend",
+        "improve",
+        "improvement",
+        "result",
+        "results",
+        "measure",
+        "measurement",
+        "body",
+        "performance",
+        "gain",
+        "gains",
+        "pr",
+        "record",
     ],
     IntentCategory.GENERAL_FITNESS_QUERY.value: [
-        "fitness", "health", "tip", "tips", "advice", "coach", "help",
-        "suggest", "suggestion", "today", "should", "recommend", "what",
+        "fitness",
+        "health",
+        "tip",
+        "tips",
+        "advice",
+        "coach",
+        "help",
+        "suggest",
+        "suggestion",
+        "today",
+        "should",
+        "recommend",
+        "what",
     ],
 }
 
@@ -169,38 +249,38 @@ class AICoachService:
 
     def __init__(
         self,
-        session_repo: Optional[AISessionRepository] = None,
-        query_repo: Optional[AIQueryRepository] = None,
-        response_repo: Optional[AIResponseRepository] = None,
-        rec_repo: Optional[AIRecommendationRepository] = None,
-        user_repo: Optional[UserRepository] = None,
-        workout_session_repo: Optional[WorkoutSessionRepository] = None,
-        nutrition_log_repo: Optional[NutritionLogRepository] = None,
-        meal_entry_repo: Optional[MealEntryRepository] = None,
-        meal_repo: Optional[MealRepository] = None,
-        food_repo: Optional[FoodRepository] = None,
-        recovery_repo: Optional[RecoveryRepository] = None,
-        sleep_repo: Optional[SleepRepository] = None,
-        habit_repo: Optional[HabitRepository] = None,
-        habit_log_repo: Optional[HabitLogRepository] = None,
-        body_measurement_repo: Optional[BodyMeasurementRepository] = None,
-        db: Optional[DatabaseManager] = None,
+        session_repo: AISessionRepository | None = None,
+        query_repo: AIQueryRepository | None = None,
+        response_repo: AIResponseRepository | None = None,
+        rec_repo: AIRecommendationRepository | None = None,
+        user_repo: UserRepository | None = None,
+        workout_session_repo: WorkoutSessionRepository | None = None,
+        nutrition_log_repo: NutritionLogRepository | None = None,
+        meal_entry_repo: MealEntryRepository | None = None,
+        meal_repo: MealRepository | None = None,
+        food_repo: FoodRepository | None = None,
+        recovery_repo: RecoveryRepository | None = None,
+        sleep_repo: SleepRepository | None = None,
+        habit_repo: HabitRepository | None = None,
+        habit_log_repo: HabitLogRepository | None = None,
+        body_measurement_repo: BodyMeasurementRepository | None = None,
+        db: DatabaseManager | None = None,
     ):
         _db = db or db_manager
-        self.session_repo       = session_repo  or AISessionRepository(db=_db)
-        self.query_repo         = query_repo    or AIQueryRepository(db=_db)
-        self.response_repo      = response_repo or AIResponseRepository(db=_db)
-        self.rec_repo           = rec_repo      or AIRecommendationRepository(db=_db)
-        self.user_repo          = user_repo     or UserRepository(db=_db)
+        self.session_repo = session_repo or AISessionRepository(db=_db)
+        self.query_repo = query_repo or AIQueryRepository(db=_db)
+        self.response_repo = response_repo or AIResponseRepository(db=_db)
+        self.rec_repo = rec_repo or AIRecommendationRepository(db=_db)
+        self.user_repo = user_repo or UserRepository(db=_db)
         self.workout_session_repo = workout_session_repo or WorkoutSessionRepository(db=_db)
         self.nutrition_log_repo = nutrition_log_repo or NutritionLogRepository(db=_db)
-        self.meal_entry_repo    = meal_entry_repo    or MealEntryRepository(db=_db)
-        self.meal_repo          = meal_repo          or MealRepository(db=_db)
-        self.food_repo          = food_repo          or FoodRepository(db=_db)
-        self.recovery_repo      = recovery_repo      or RecoveryRepository(db=_db)
-        self.sleep_repo         = sleep_repo         or SleepRepository(db=_db)
-        self.habit_repo         = habit_repo         or HabitRepository(db=_db)
-        self.habit_log_repo     = habit_log_repo     or HabitLogRepository(db=_db)
+        self.meal_entry_repo = meal_entry_repo or MealEntryRepository(db=_db)
+        self.meal_repo = meal_repo or MealRepository(db=_db)
+        self.food_repo = food_repo or FoodRepository(db=_db)
+        self.recovery_repo = recovery_repo or RecoveryRepository(db=_db)
+        self.sleep_repo = sleep_repo or SleepRepository(db=_db)
+        self.habit_repo = habit_repo or HabitRepository(db=_db)
+        self.habit_log_repo = habit_log_repo or HabitLogRepository(db=_db)
         self.body_measurement_repo = body_measurement_repo or BodyMeasurementRepository(db=_db)
 
     # -----------------------------------------------------------------------
@@ -222,7 +302,7 @@ class AICoachService:
             return IntentCategory.GENERAL_FITNESS_QUERY.value
 
         tokens = set(raw_text.lower().split())
-        scores: Dict[str, int] = {}
+        scores: dict[str, int] = {}
 
         for category, keywords in INTENT_KEYWORDS.items():
             scores[category] = sum(1 for kw in keywords if kw in tokens)
@@ -255,36 +335,36 @@ class AICoachService:
     # B. Context Engine
     # -----------------------------------------------------------------------
 
-    def build_user_context(self, user_id: str, context_date: str) -> Dict[str, Any]:
-        """Aggregates read-only data from Sprints 3–5 into a unified context snapshot.
+    def build_user_context(self, user_id: str, context_date: str) -> dict[str, Any]:
+        """Aggregates read-only data from Sprints 3-5 into a unified context snapshot.
 
         Returns a dict with safe defaults so downstream logic never raises KeyError.
-        AI NEVER modifies Sprint 3–5 tables — read-only access only.
+        AI NEVER modifies Sprint 3-5 tables -- read-only access only.
         """
-        ctx: Dict[str, Any] = {
-            "user_id":               user_id,
-            "context_date":          context_date,
-            "recovery_score":        None,
-            "readiness_state":       None,
-            "sleep_hours":           None,
-            "sleep_quality":         None,
-            "daily_calories":        0.0,
-            "daily_protein_g":       0.0,
-            "daily_carbs_g":         0.0,
-            "daily_fat_g":           0.0,
-            "calorie_target":        2000.0,   # heuristic default
-            "protein_target_g":      150.0,    # heuristic default
-            "workout_sessions_7d":   0,
-            "habit_count":           0,
+        ctx: dict[str, Any] = {
+            "user_id": user_id,
+            "context_date": context_date,
+            "recovery_score": None,
+            "readiness_state": None,
+            "sleep_hours": None,
+            "sleep_quality": None,
+            "daily_calories": 0.0,
+            "daily_protein_g": 0.0,
+            "daily_carbs_g": 0.0,
+            "daily_fat_g": 0.0,
+            "calorie_target": 2000.0,  # heuristic default
+            "protein_target_g": 150.0,  # heuristic default
+            "workout_sessions_7d": 0,
+            "habit_count": 0,
             "habit_avg_consistency": 0.0,
-            "body_weight_kg":        None,
+            "body_weight_kg": None,
         }
 
         # --- Recovery & Sleep (Sprint 5) ---
         try:
             rec_log = self.recovery_repo.get_recovery_log_by_date(user_id, context_date)
             if rec_log:
-                ctx["recovery_score"]  = rec_log.recovery_score
+                ctx["recovery_score"] = rec_log.recovery_score
                 ctx["readiness_state"] = rec_log.readiness_state
         except Exception as e:
             logger.warning(f"Context: could not fetch recovery log: {e}")
@@ -292,7 +372,7 @@ class AICoachService:
         try:
             sleep_log = self.sleep_repo.get_sleep_log_by_date(user_id, context_date)
             if sleep_log:
-                ctx["sleep_hours"]   = sleep_log.hours
+                ctx["sleep_hours"] = sleep_log.hours
                 ctx["sleep_quality"] = sleep_log.quality_score
         except Exception as e:
             logger.warning(f"Context: could not fetch sleep log: {e}")
@@ -301,10 +381,10 @@ class AICoachService:
         try:
             nut_log = self.nutrition_log_repo.get_log_by_date(user_id, context_date)
             if nut_log:
-                ctx["daily_calories"]  = nut_log.total_calories
+                ctx["daily_calories"] = nut_log.total_calories
                 ctx["daily_protein_g"] = nut_log.total_protein
-                ctx["daily_carbs_g"]   = nut_log.total_carbs
-                ctx["daily_fat_g"]     = nut_log.total_fat
+                ctx["daily_carbs_g"] = nut_log.total_carbs
+                ctx["daily_fat_g"] = nut_log.total_fat
             else:
                 # Fall back to real-time calculation from meal entries
                 meals = self.meal_repo.get_meals_by_date(user_id, context_date)
@@ -314,10 +394,10 @@ class AICoachService:
                         food = self.food_repo.get_food(entry.food_id)
                         if food and food.serving_size_g > 0:
                             scale = entry.quantity_g / food.serving_size_g
-                            ctx["daily_calories"]  += food.calories * scale
-                            ctx["daily_protein_g"] += food.protein  * scale
-                            ctx["daily_carbs_g"]   += food.carbs    * scale
-                            ctx["daily_fat_g"]     += food.fats     * scale
+                            ctx["daily_calories"] += food.calories * scale
+                            ctx["daily_protein_g"] += food.protein * scale
+                            ctx["daily_carbs_g"] += food.carbs * scale
+                            ctx["daily_fat_g"] += food.fats * scale
         except Exception as e:
             logger.warning(f"Context: could not fetch nutrition data: {e}")
 
@@ -327,9 +407,9 @@ class AICoachService:
             if measurements:
                 # Most recent measurement
                 most_recent = max(measurements, key=lambda m: m.logged_at)
-                ctx["body_weight_kg"]   = most_recent.weight_kg
+                ctx["body_weight_kg"] = most_recent.weight_kg
                 ctx["protein_target_g"] = most_recent.weight_kg * 1.6  # 1.6g/kg heuristic
-                ctx["calorie_target"]   = most_recent.weight_kg * 30.0  # ~30 kcal/kg heuristic
+                ctx["calorie_target"] = most_recent.weight_kg * 30.0  # ~30 kcal/kg heuristic
         except Exception as e:
             logger.warning(f"Context: could not fetch body measurement: {e}")
 
@@ -342,9 +422,7 @@ class AICoachService:
                 "WHERE user_id = ? AND status = 'COMPLETED' "
                 "AND start_time >= ? AND start_time < ?;"
             )
-            rows = self.workout_session_repo.db.execute_read(
-                query, (user_id, seven_days_ago, context_date)
-            )
+            rows = self.workout_session_repo.db.execute_read(query, (user_id, seven_days_ago, context_date))
             if rows:
                 ctx["workout_sessions_7d"] = int(rows[0].get("cnt", 0) or 0)
         except Exception as e:
@@ -358,19 +436,13 @@ class AICoachService:
                 # Compute average consistency over last 30 days for each habit
                 log_dt = datetime.strptime(context_date, "%Y-%m-%d")
                 start_date = (log_dt - timedelta(days=29)).strftime("%Y-%m-%d")
-                consistency_scores: List[float] = []
+                consistency_scores: list[float] = []
                 for habit in habits:
-                    logs = self.habit_log_repo.get_habit_logs_by_date_range(
-                        user_id, start_date, context_date
-                    )
-                    completed = sum(
-                        1 for l in logs
-                        if l.habit_id == habit.habit_id and l.status == "completed"
-                    )
+                    logs = self.habit_log_repo.get_habit_logs_by_date_range(user_id, start_date, context_date)
+                    completed = sum(1 for log in logs if log.habit_id == habit.habit_id and log.status == "completed")
                     consistency_scores.append((completed / 30.0) * 100.0)
                 ctx["habit_avg_consistency"] = (
-                    sum(consistency_scores) / len(consistency_scores)
-                    if consistency_scores else 0.0
+                    sum(consistency_scores) / len(consistency_scores) if consistency_scores else 0.0
                 )
         except Exception as e:
             logger.warning(f"Context: could not fetch habit data: {e}")
@@ -382,152 +454,169 @@ class AICoachService:
     # -----------------------------------------------------------------------
 
     def generate_recommendations(
-        self, user_id: str, context: Dict[str, Any], context_date: str
-    ) -> List[Recommendation]:
+        self, user_id: str, context: dict[str, Any], context_date: str
+    ) -> list[Recommendation]:
         """Evaluates all named rules against the user context and returns triggered recommendations.
 
         Every Recommendation.rule_source names the InsightRule.rule_id that triggered it.
         No recommendations are generated without a named rule. No random suggestions.
         """
         import uuid
-        recs: List[Recommendation] = []
+
+        recs: list[Recommendation] = []
         triggered_any = False
 
         recovery_score = context.get("recovery_score")
-        sleep_hours    = context.get("sleep_hours")
+        sleep_hours = context.get("sleep_hours")
         protein_actual = context.get("daily_protein_g", 0.0)
         protein_target = context.get("protein_target_g", 150.0)
-        cal_actual     = context.get("daily_calories", 0.0)
-        cal_target     = context.get("calorie_target", 2000.0)
-        habit_consist  = context.get("habit_avg_consistency", 0.0)
-        sessions_7d    = context.get("workout_sessions_7d", 0)
+        cal_actual = context.get("daily_calories", 0.0)
+        cal_target = context.get("calorie_target", 2000.0)
+        habit_consist = context.get("habit_avg_consistency", 0.0)
+        sessions_7d = context.get("workout_sessions_7d", 0)
 
         # RULE_LOW_RECOVERY
         if recovery_score is not None and recovery_score < 40:
-            recs.append(Recommendation(
-                recommendation_id=str(uuid.uuid4()),
-                user_id=user_id,
-                category=RULE_LOW_RECOVERY.category,
-                title="Take a Full Rest Day",
-                body=RULE_LOW_RECOVERY.message.format(score=recovery_score),
-                rule_source=RULE_LOW_RECOVERY.rule_id,
-                priority=RecommendationPriority.HIGH.value,
-                log_date=context_date,
-            ))
+            recs.append(
+                Recommendation(
+                    recommendation_id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    category=RULE_LOW_RECOVERY.category,
+                    title="Take a Full Rest Day",
+                    body=RULE_LOW_RECOVERY.message.format(score=recovery_score),
+                    rule_source=RULE_LOW_RECOVERY.rule_id,
+                    priority=RecommendationPriority.HIGH.value,
+                    log_date=context_date,
+                )
+            )
             triggered_any = True
 
         # RULE_MODERATE_RECOVERY (only if LOW not triggered)
         elif recovery_score is not None and 40 <= recovery_score < 70:
-            recs.append(Recommendation(
-                recommendation_id=str(uuid.uuid4()),
-                user_id=user_id,
-                category=RULE_MODERATE_RECOVERY.category,
-                title="Light Training Day",
-                body=RULE_MODERATE_RECOVERY.message.format(score=recovery_score),
-                rule_source=RULE_MODERATE_RECOVERY.rule_id,
-                priority=RecommendationPriority.MEDIUM.value,
-                log_date=context_date,
-            ))
+            recs.append(
+                Recommendation(
+                    recommendation_id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    category=RULE_MODERATE_RECOVERY.category,
+                    title="Light Training Day",
+                    body=RULE_MODERATE_RECOVERY.message.format(score=recovery_score),
+                    rule_source=RULE_MODERATE_RECOVERY.rule_id,
+                    priority=RecommendationPriority.MEDIUM.value,
+                    log_date=context_date,
+                )
+            )
             triggered_any = True
 
         # RULE_GOOD_RECOVERY
         elif recovery_score is not None and recovery_score >= 70:
-            recs.append(Recommendation(
-                recommendation_id=str(uuid.uuid4()),
-                user_id=user_id,
-                category=RULE_GOOD_RECOVERY.category,
-                title="Great Day to Train Hard",
-                body=RULE_GOOD_RECOVERY.message.format(score=recovery_score),
-                rule_source=RULE_GOOD_RECOVERY.rule_id,
-                priority=RecommendationPriority.LOW.value,
-                log_date=context_date,
-            ))
+            recs.append(
+                Recommendation(
+                    recommendation_id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    category=RULE_GOOD_RECOVERY.category,
+                    title="Great Day to Train Hard",
+                    body=RULE_GOOD_RECOVERY.message.format(score=recovery_score),
+                    rule_source=RULE_GOOD_RECOVERY.rule_id,
+                    priority=RecommendationPriority.LOW.value,
+                    log_date=context_date,
+                )
+            )
             triggered_any = True
 
         # RULE_LOW_SLEEP
         if sleep_hours is not None and sleep_hours < 6.0:
-            recs.append(Recommendation(
-                recommendation_id=str(uuid.uuid4()),
-                user_id=user_id,
-                category=RULE_LOW_SLEEP.category,
-                title="Prioritise Sleep Tonight",
-                body=RULE_LOW_SLEEP.message.format(hours=sleep_hours),
-                rule_source=RULE_LOW_SLEEP.rule_id,
-                priority=RecommendationPriority.HIGH.value,
-                log_date=context_date,
-            ))
+            recs.append(
+                Recommendation(
+                    recommendation_id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    category=RULE_LOW_SLEEP.category,
+                    title="Prioritise Sleep Tonight",
+                    body=RULE_LOW_SLEEP.message.format(hours=sleep_hours),
+                    rule_source=RULE_LOW_SLEEP.rule_id,
+                    priority=RecommendationPriority.HIGH.value,
+                    log_date=context_date,
+                )
+            )
             triggered_any = True
 
         # RULE_PROTEIN_DEFICIT
         if protein_actual < protein_target * 0.8:
-            recs.append(Recommendation(
-                recommendation_id=str(uuid.uuid4()),
-                user_id=user_id,
-                category=RULE_PROTEIN_DEFICIT.category,
-                title="Increase Protein Intake",
-                body=RULE_PROTEIN_DEFICIT.message.format(
-                    actual=protein_actual, target=protein_target
-                ),
-                rule_source=RULE_PROTEIN_DEFICIT.rule_id,
-                priority=RecommendationPriority.MEDIUM.value,
-                log_date=context_date,
-            ))
+            recs.append(
+                Recommendation(
+                    recommendation_id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    category=RULE_PROTEIN_DEFICIT.category,
+                    title="Increase Protein Intake",
+                    body=RULE_PROTEIN_DEFICIT.message.format(actual=protein_actual, target=protein_target),
+                    rule_source=RULE_PROTEIN_DEFICIT.rule_id,
+                    priority=RecommendationPriority.MEDIUM.value,
+                    log_date=context_date,
+                )
+            )
             triggered_any = True
 
         # RULE_CALORIE_SURPLUS
         if cal_target > 0 and cal_actual > cal_target * 1.15:
-            recs.append(Recommendation(
-                recommendation_id=str(uuid.uuid4()),
-                user_id=user_id,
-                category=RULE_CALORIE_SURPLUS.category,
-                title="Caloric Surplus Alert",
-                body=RULE_CALORIE_SURPLUS.message.format(actual=cal_actual),
-                rule_source=RULE_CALORIE_SURPLUS.rule_id,
-                priority=RecommendationPriority.MEDIUM.value,
-                log_date=context_date,
-            ))
+            recs.append(
+                Recommendation(
+                    recommendation_id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    category=RULE_CALORIE_SURPLUS.category,
+                    title="Caloric Surplus Alert",
+                    body=RULE_CALORIE_SURPLUS.message.format(actual=cal_actual),
+                    rule_source=RULE_CALORIE_SURPLUS.rule_id,
+                    priority=RecommendationPriority.MEDIUM.value,
+                    log_date=context_date,
+                )
+            )
             triggered_any = True
 
         # RULE_LOW_HABIT_CONSISTENCY
         if context.get("habit_count", 0) > 0 and habit_consist < 50.0:
-            recs.append(Recommendation(
-                recommendation_id=str(uuid.uuid4()),
-                user_id=user_id,
-                category=RULE_LOW_HABIT_CONSISTENCY.category,
-                title="Simplify Your Habits",
-                body=RULE_LOW_HABIT_CONSISTENCY.message.format(pct=habit_consist),
-                rule_source=RULE_LOW_HABIT_CONSISTENCY.rule_id,
-                priority=RecommendationPriority.MEDIUM.value,
-                log_date=context_date,
-            ))
+            recs.append(
+                Recommendation(
+                    recommendation_id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    category=RULE_LOW_HABIT_CONSISTENCY.category,
+                    title="Simplify Your Habits",
+                    body=RULE_LOW_HABIT_CONSISTENCY.message.format(pct=habit_consist),
+                    rule_source=RULE_LOW_HABIT_CONSISTENCY.rule_id,
+                    priority=RecommendationPriority.MEDIUM.value,
+                    log_date=context_date,
+                )
+            )
             triggered_any = True
 
         # RULE_NO_RECENT_WORKOUTS
         if sessions_7d == 0:
-            recs.append(Recommendation(
-                recommendation_id=str(uuid.uuid4()),
-                user_id=user_id,
-                category=RULE_NO_RECENT_WORKOUTS.category,
-                title="Resume Your Training",
-                body=RULE_NO_RECENT_WORKOUTS.message,
-                rule_source=RULE_NO_RECENT_WORKOUTS.rule_id,
-                priority=RecommendationPriority.HIGH.value,
-                log_date=context_date,
-            ))
+            recs.append(
+                Recommendation(
+                    recommendation_id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    category=RULE_NO_RECENT_WORKOUTS.category,
+                    title="Resume Your Training",
+                    body=RULE_NO_RECENT_WORKOUTS.message,
+                    rule_source=RULE_NO_RECENT_WORKOUTS.rule_id,
+                    priority=RecommendationPriority.HIGH.value,
+                    log_date=context_date,
+                )
+            )
             triggered_any = True
 
         # Positive catch-all when no negative rule fires
         if not triggered_any:
-            recs.append(Recommendation(
-                recommendation_id=str(uuid.uuid4()),
-                user_id=user_id,
-                category=RULE_FULL_CONTEXT_POSITIVE.category,
-                title="Everything Looks Great!",
-                body=RULE_FULL_CONTEXT_POSITIVE.message,
-                rule_source=RULE_FULL_CONTEXT_POSITIVE.rule_id,
-                priority=RecommendationPriority.LOW.value,
-                log_date=context_date,
-            ))
+            recs.append(
+                Recommendation(
+                    recommendation_id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    category=RULE_FULL_CONTEXT_POSITIVE.category,
+                    title="Everything Looks Great!",
+                    body=RULE_FULL_CONTEXT_POSITIVE.message,
+                    rule_source=RULE_FULL_CONTEXT_POSITIVE.rule_id,
+                    priority=RecommendationPriority.LOW.value,
+                    log_date=context_date,
+                )
+            )
 
         return recs
 
@@ -542,14 +631,13 @@ class AICoachService:
         read directly from the DB via build_user_context().
         """
         ctx = self.build_user_context(user_id, context_date)
-        parts: List[str] = [f"=== Daily Fitness Insight — {context_date} ==="]
+        parts: list[str] = [f"=== Daily Fitness Insight — {context_date} ==="]
 
         # Recovery
         if ctx["recovery_score"] is not None:
             state = ctx["readiness_state"] or "unknown"
             parts.append(
-                f"Recovery: {ctx['recovery_score']:.0f}/100 ({state}) | "
-                f"Sleep: {ctx['sleep_hours']:.1f}h"
+                f"Recovery: {ctx['recovery_score']:.0f}/100 ({state}) | Sleep: {ctx['sleep_hours']:.1f}h"
                 if ctx["sleep_hours"] is not None
                 else f"Recovery: {ctx['recovery_score']:.0f}/100 ({state})"
             )
@@ -570,8 +658,7 @@ class AICoachService:
         # Habits
         if ctx["habit_count"] > 0:
             parts.append(
-                f"Habits: {ctx['habit_count']} tracked | "
-                f"Average consistency: {ctx['habit_avg_consistency']:.1f}%"
+                f"Habits: {ctx['habit_count']} tracked | Average consistency: {ctx['habit_avg_consistency']:.1f}%"
             )
 
         # Top recommendation
@@ -598,10 +685,10 @@ class AICoachService:
         start_dt = end_dt - timedelta(days=6)
         days = [(start_dt + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
 
-        recovery_scores: List[float] = []
-        sleep_hours_list: List[float] = []
-        calorie_list: List[float] = []
-        protein_list: List[float] = []
+        recovery_scores: list[float] = []
+        sleep_hours_list: list[float] = []
+        calorie_list: list[float] = []
+        protein_list: list[float] = []
 
         for d in days:
             try:
@@ -633,17 +720,15 @@ class AICoachService:
                 "WHERE user_id = ? AND status = 'COMPLETED' "
                 "AND start_time >= ? AND start_time <= ?;"
             )
-            rows = self.workout_session_repo.db.execute_read(
-                query, (user_id, days[0], end_date)
-            )
+            rows = self.workout_session_repo.db.execute_read(query, (user_id, days[0], end_date))
             workout_count = int(rows[0].get("cnt", 0)) if rows else 0
         except Exception:
             workout_count = 0
 
         avg_recovery = sum(recovery_scores) / len(recovery_scores) if recovery_scores else 0.0
-        avg_sleep    = sum(sleep_hours_list) / len(sleep_hours_list) if sleep_hours_list else 0.0
+        avg_sleep = sum(sleep_hours_list) / len(sleep_hours_list) if sleep_hours_list else 0.0
         avg_calories = sum(calorie_list) / len(calorie_list) if calorie_list else 0.0
-        avg_protein  = sum(protein_list) / len(protein_list) if protein_list else 0.0
+        avg_protein = sum(protein_list) / len(protein_list) if protein_list else 0.0
 
         lines = [
             f"=== Weekly Summary: {days[0]} → {end_date} ===",
@@ -655,29 +740,25 @@ class AICoachService:
         ]
         return "\n".join(lines)
 
-    def generate_warning_alerts(self, context: Dict[str, Any]) -> List[str]:
+    def generate_warning_alerts(self, context: dict[str, Any]) -> list[str]:
         """Returns a list of plain-text warning messages for critical conditions.
 
         Only generates output when a named rule threshold is breached.
         """
-        alerts: List[str] = []
+        alerts: list[str] = []
 
         recovery_score = context.get("recovery_score")
-        sleep_hours    = context.get("sleep_hours")
+        sleep_hours = context.get("sleep_hours")
         protein_actual = context.get("daily_protein_g", 0.0)
         protein_target = context.get("protein_target_g", 150.0)
 
         if recovery_score is not None and recovery_score < 40:
             alerts.append(
-                f"⚠️  [{RULE_LOW_RECOVERY.rule_id}] Recovery score critical: "
-                f"{recovery_score:.0f}/100. Rest required."
+                f"⚠️  [{RULE_LOW_RECOVERY.rule_id}] Recovery score critical: {recovery_score:.0f}/100. Rest required."
             )
 
         if sleep_hours is not None and sleep_hours < 6.0:
-            alerts.append(
-                f"⚠️  [{RULE_LOW_SLEEP.rule_id}] Sleep deficit: "
-                f"{sleep_hours:.1f}h (<6h minimum)."
-            )
+            alerts.append(f"⚠️  [{RULE_LOW_SLEEP.rule_id}] Sleep deficit: {sleep_hours:.1f}h (<6h minimum).")
 
         if protein_actual < protein_target * 0.8:
             alerts.append(
@@ -695,9 +776,9 @@ class AICoachService:
         ctx_today = self.build_user_context(user_id, context_date)
 
         try:
-            end_dt   = datetime.strptime(context_date, "%Y-%m-%d")
+            end_dt = datetime.strptime(context_date, "%Y-%m-%d")
             start_dt = end_dt - timedelta(days=7)
-            cal_list: List[float] = []
+            cal_list: list[float] = []
             for i in range(7):
                 d = (start_dt + timedelta(days=i)).strftime("%Y-%m-%d")
                 nut = self.nutrition_log_repo.get_log_by_date(user_id, d)
@@ -752,14 +833,14 @@ class AICoachService:
         response_id: str,
         user_id: str,
         raw_text: str,
-        context_date: Optional[str] = None,
-    ) -> Tuple[AIQuery, AIResponse, List[Recommendation]]:
+        context_date: str | None = None,
+    ) -> tuple[AIQuery, AIResponse, list[Recommendation]]:
         """Full pipeline: validate → classify → build context → recommend → respond → persist.
 
         Steps:
             1. Validate: non-empty text, session exists, user exists
             2. Classify intent via NLP keyword scoring
-            3. Build user context from Sprint 3–5 data (read-only)
+            3. Build user context from Sprint 3-5 data (read-only)
             4. Generate recommendations via deterministic rules
             5. Build response text + rule_source (explainability enforced)
             6. Persist query, response, and recommendations to DB
@@ -833,9 +914,9 @@ class AICoachService:
     def get_recommendations(
         self,
         user_id: str,
-        category: Optional[str] = None,
-        log_date: Optional[str] = None,
-    ) -> List[Recommendation]:
+        category: str | None = None,
+        log_date: str | None = None,
+    ) -> list[Recommendation]:
         """Returns stored recommendations for a user, optionally filtered."""
         if log_date:
             return self.rec_repo.get_recommendations_by_date(user_id, log_date)
@@ -843,9 +924,7 @@ class AICoachService:
             return self.rec_repo.get_recommendations_by_category(user_id, category)
         return self.rec_repo.get_user_recommendations(user_id)
 
-    def get_session_history(
-        self, session_id: str
-    ) -> List[Tuple[AIQuery, Optional[AIResponse]]]:
+    def get_session_history(self, session_id: str) -> list[tuple[AIQuery, AIResponse | None]]:
         """Returns all (query, response) pairs for a session in chronological order."""
         queries = self.query_repo.get_session_queries(session_id)
         result = []
@@ -861,9 +940,9 @@ class AICoachService:
     def _build_response(
         self,
         intent: str,
-        context: Dict[str, Any],
-        recommendations: List[Recommendation],
-    ) -> Tuple[str, str]:
+        context: dict[str, Any],
+        recommendations: list[Recommendation],
+    ) -> tuple[str, str]:
         """Builds a response text and rule_source string from intent + recommendations.
 
         The rule_source is always a comma-separated list of rule_ids from triggered
@@ -875,25 +954,24 @@ class AICoachService:
         rule_source = ", ".join(rule_ids) if rule_ids else "RULE_FULL_CONTEXT_POSITIVE"
 
         intent_intro = {
-            IntentCategory.NUTRITION_QUERY.value:       "Here's your nutrition guidance:",
-            IntentCategory.WORKOUT_QUERY.value:         "Here's your workout guidance:",
-            IntentCategory.RECOVERY_QUERY.value:        "Here's your recovery guidance:",
-            IntentCategory.HABIT_QUERY.value:           "Here's your habit guidance:",
-            IntentCategory.PROGRESS_QUERY.value:        "Here's your progress overview:",
+            IntentCategory.NUTRITION_QUERY.value: "Here's your nutrition guidance:",
+            IntentCategory.WORKOUT_QUERY.value: "Here's your workout guidance:",
+            IntentCategory.RECOVERY_QUERY.value: "Here's your recovery guidance:",
+            IntentCategory.HABIT_QUERY.value: "Here's your habit guidance:",
+            IntentCategory.PROGRESS_QUERY.value: "Here's your progress overview:",
             IntentCategory.GENERAL_FITNESS_QUERY.value: "Here's your fitness coaching summary:",
         }.get(intent, "Here's your fitness coaching summary:")
 
         # Filter recommendations relevant to the intent category
         intent_to_category = {
-            IntentCategory.NUTRITION_QUERY.value:       RecommendationCategory.NUTRITION.value,
-            IntentCategory.WORKOUT_QUERY.value:         RecommendationCategory.WORKOUT.value,
-            IntentCategory.RECOVERY_QUERY.value:        RecommendationCategory.RECOVERY.value,
-            IntentCategory.HABIT_QUERY.value:           RecommendationCategory.HABIT.value,
+            IntentCategory.NUTRITION_QUERY.value: RecommendationCategory.NUTRITION.value,
+            IntentCategory.WORKOUT_QUERY.value: RecommendationCategory.WORKOUT.value,
+            IntentCategory.RECOVERY_QUERY.value: RecommendationCategory.RECOVERY.value,
+            IntentCategory.HABIT_QUERY.value: RecommendationCategory.HABIT.value,
         }
         target_category = intent_to_category.get(intent)
         relevant = (
-            [r for r in recommendations if r.category == target_category]
-            if target_category else recommendations
+            [r for r in recommendations if r.category == target_category] if target_category else recommendations
         ) or recommendations  # fallback to all if category produces nothing
 
         # Build response body
@@ -905,9 +983,9 @@ class AICoachService:
         lines += [
             "",
             f"[Recovery: {context['recovery_score']:.0f}/100]"
-            if context.get("recovery_score") is not None else "[Recovery: No data]",
-            f"[Nutrition: {context['daily_calories']:.0f} kcal | "
-            f"Protein: {context['daily_protein_g']:.0f}g]",
+            if context.get("recovery_score") is not None
+            else "[Recovery: No data]",
+            f"[Nutrition: {context['daily_calories']:.0f} kcal | Protein: {context['daily_protein_g']:.0f}g]",
             f"[Workouts (7d): {context['workout_sessions_7d']}]",
         ]
 

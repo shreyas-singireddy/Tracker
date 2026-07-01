@@ -1,6 +1,5 @@
-from typing import Optional, List
-from app.repositories.base import BaseRepository
 from app.models.domain import Goal
+from app.repositories.base import BaseRepository
 
 
 class GoalRepository(BaseRepository):
@@ -11,12 +10,12 @@ class GoalRepository(BaseRepository):
         self.create("goals", goal.to_dict())
         return goal.goal_id
 
-    def get_goal(self, goal_id: str) -> Optional[Goal]:
+    def get_goal(self, goal_id: str) -> Goal | None:
         """Fetches a Goal object by its goal_id."""
         row = self.read("goals", "goal_id", goal_id)
         return Goal.from_dict(row) if row else None
 
-    def get_user_goals(self, user_id: str) -> List[Goal]:
+    def get_user_goals(self, user_id: str) -> list[Goal]:
         """Retrieves all goals associated with a specific user."""
         query = "SELECT * FROM goals WHERE user_id = ?;"
         rows = self.db.execute_read(query, (user_id,))

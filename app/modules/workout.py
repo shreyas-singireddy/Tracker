@@ -1,14 +1,17 @@
 """WorkoutModule standardization interface wrapper for FitOS (Sprint 10)."""
-from typing import Dict, Any
+
+from typing import Any
+
+from app.database.connection import db_manager
 from app.modules.base import BaseModule
-from app.services.workout import WorkoutService
 from app.repositories.workout import (
+    ExerciseLogRepository,
+    ExerciseSetRepository,
     WorkoutPlanRepository,
     WorkoutSessionRepository,
-    ExerciseLogRepository,
-    ExerciseSetRepository
 )
-from app.database.connection import db_manager
+from app.services.workout import WorkoutService
+
 
 class WorkoutModule(BaseModule):
     """Encapsulates Workout domain logic interfaces."""
@@ -27,28 +30,28 @@ class WorkoutModule(BaseModule):
         self.log_repo = ExerciseLogRepository()
         self.set_repo = ExerciseSetRepository()
         self.service = WorkoutService(
-            plan_repo=self.plan_repo,
-            session_repo=self.session_repo,
-            log_repo=self.log_repo,
-            set_repo=self.set_repo
+            plan_repo=self.plan_repo, session_repo=self.session_repo, log_repo=self.log_repo, set_repo=self.set_repo
         )
 
-    def get_services(self) -> Dict[str, Any]:
+    def get_services(self) -> dict[str, Any]:
         return {"WorkoutService": self.service}
 
-    def get_repositories(self) -> Dict[str, Any]:
+    def get_repositories(self) -> dict[str, Any]:
         return {
             "WorkoutPlanRepository": self.plan_repo,
             "WorkoutSessionRepository": self.session_repo,
             "ExerciseLogRepository": self.log_repo,
-            "ExerciseSetRepository": self.set_repo
+            "ExerciseSetRepository": self.set_repo,
         }
 
-    def health_check(self) -> Dict[str, Any]:
+    def health_check(self) -> dict[str, Any]:
         """Verify we can access the database tables."""
         try:
             db_manager.execute_read("SELECT 1 FROM workout_plans LIMIT 1;")
             db_manager.execute_read("SELECT 1 FROM workout_sessions LIMIT 1;")
-            return {"status": "GREEN", "details": "Workout module tables are readable and database connection is healthy."}
+            return {
+                "status": "GREEN",
+                "details": "Workout module tables are readable and database connection is healthy.",
+            }
         except Exception as e:
-            return {"status": "RED", "details": f"Workout health check failed: {str(e)}"}
+            return {"status": "RED", "details": f"Workout health check failed: {e!s}"}

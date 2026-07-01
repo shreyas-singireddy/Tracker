@@ -1,52 +1,33 @@
 # Models package marker
-from app.models.domain import (
-    User,
-    UserProfile,
-    Goal,
-    FoodItem,
-    Exercise,
-    MealLog,
-    WorkoutLog,
-    HabitLog,
-    BodyMeasurement
-)
-from app.models.workout import (
-    TrainingSplit,
-    WorkoutPlan,
-    WorkoutSession,
-    ExerciseLog,
-    ExerciseSet
-)
-from app.models.nutrition import (
-    MealType,
-    Meal,
-    MealEntry,
-    NutritionLog,
-    MacroProfile
-)
-from app.models.habit_recovery import (
-    ReadinessState,
-    HabitFrequency,
-    Habit,
-    SleepLog,
-    RecoveryLog,
-    RecoveryProfile
-)
-from app.models.analytics import (
-    FitnessScore,
-    WeeklyReport,
-    MonthlyReport,
-    AnalyticsSnapshot,
-    ProgressTrend,
-    InsightMetric
-)
 from app.models.ai import (
-    IntentCategory,
-    RecommendationPriority,
-    RecommendationCategory,
     AICoachSession,
     AIQuery,
     AIResponse,
+    InsightRule,
+    IntentCategory,
     Recommendation,
-    InsightRule
+    RecommendationCategory,
+    RecommendationPriority,
 )
+from app.models.analytics import (
+    AnalyticsSnapshot,
+    FitnessScore,
+    InsightMetric,
+    MonthlyReport,
+    ProgressTrend,
+    WeeklyReport,
+)
+from app.models.domain import (
+    BodyMeasurement,
+    Exercise,
+    FoodItem,
+    Goal,
+    HabitLog,
+    MealLog,
+    User,
+    UserProfile,
+    WorkoutLog,
+)
+from app.models.habit_recovery import Habit, HabitFrequency, ReadinessState, RecoveryLog, RecoveryProfile, SleepLog
+from app.models.nutrition import MacroProfile, Meal, MealEntry, MealType, NutritionLog
+from app.models.workout import ExerciseLog, ExerciseSet, TrainingSplit, WorkoutPlan, WorkoutSession

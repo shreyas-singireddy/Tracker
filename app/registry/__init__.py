@@ -1,7 +1,3 @@
 """Registry package exports."""
-from app.registry.module_registry import (
-    ServiceRegistry,
-    DependencyGraph,
-    ModuleRegistry,
-    module_registry
-)
+
+from app.registry.module_registry import DependencyGraph, ModuleRegistry, ServiceRegistry, module_registry

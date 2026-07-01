@@ -4,6 +4,7 @@
 
 # Core
 streamlit==1.38.0
+pandas==2.2.3
 
 # Database
 # SQLite3 is part of Python standard library — no extra dependency needed

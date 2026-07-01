@@ -1,0 +1,6 @@
+[flake8]
+max-line-length = 120
+extend-ignore = E203, E266, E501, W503, F401, F403, F811, F841
+exclude = .venv, build, htmlcov, tests, __pycache__
+per-file-ignores =
+    __init__.py: F401

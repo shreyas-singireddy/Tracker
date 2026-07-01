@@ -5,7 +5,7 @@ Runs database checks, service lookups, module audits, and dependency verificatio
 Returns status: GREEN, YELLOW, or RED.
 Exits with 0 on GREEN/YELLOW, and 1 on RED.
 """
-import os
+
 import sys
 from pathlib import Path
 
@@ -13,15 +13,16 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.core.config import settings
 from app.core.bootloader import Bootloader
-from app.registry.module_registry import module_registry, ServiceRegistry
+from app.core.config import settings
+from app.registry.module_registry import ServiceRegistry, module_registry
+
 
 def run_health_check():
     print("=" * 60)
     print("           FitOS System Health Diagnostics")
     print("=" * 60)
-    
+
     # 1. Boot system to register modules and services
     print("[1/4] Booting FitOS System Registry...")
     try:
@@ -36,7 +37,7 @@ def run_health_check():
     print("\n[2/4] Auditing Domain Modules...")
     all_green = True
     any_yellow = False
-    
+
     modules_health = module_registry.health_check_all()
     for mod_name, check_res in modules_health["modules"].items():
         status = check_res.get("status", "RED")
@@ -58,7 +59,7 @@ def run_health_check():
         "HabitService",
         "RecoveryService",
         "AICoachService",
-        "AnalyticsService"
+        "AnalyticsService",
     ]
     for s_name in required_services:
         try:
@@ -78,7 +79,7 @@ def run_health_check():
     print(f"  * Version        : {settings.VERSION}")
     print(f"  * Offline First  : {settings.OFFLINE_MODE} (Required: True)")
     print(f"  * Database Path  : {settings.DB_PATH}")
-    
+
     if not settings.OFFLINE_MODE:
         print("  [FAIL] OFFLINE_MODE setting must be Enforced!")
         all_green = False
@@ -97,6 +98,7 @@ def run_health_check():
         print("FINAL STATUS: GREEN (All Systems Healthy)")
         print("=" * 60)
         sys.exit(0)
+
 
 if __name__ == "__main__":
     run_health_check()

@@ -1,19 +1,25 @@
-import streamlit as st
 import uuid
-from app.services.nutrition import NutritionService
+
+import streamlit as st
+
 from app.models.domain import FoodItem
 from app.models.nutrition import Meal, MealEntry, MealType
+from app.services.nutrition import NutritionService
+
 
 def render():
     user_id = st.session_state.current_user_id
     selected_date = st.session_state.selected_date
 
-    st.markdown("""
+    st.markdown(
+        """
         <div style='margin-bottom: 24px;'>
             <h1 class='gradient-text' style='font-size: 2.2rem; margin-bottom: 4px;'>Nutrition & Meals</h1>
             <p style='color: #94a3b8; font-size: 0.95rem; margin: 0;'>Log meals, track macro distributions, and manage your food database catalog.</p>
         </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
     if not user_id:
         st.info("💡 Please select or create an active profile in Settings to load nutrition logs.")
@@ -26,7 +32,7 @@ def render():
     # --- TAB 1: Daily Meal Logs ---
     with tab_today:
         meals = nutrition_service.get_meals_for_date(user_id, selected_date)
-        
+
         # Calculate daily summaries
         daily_cals = 0.0
         daily_protein = 0.0
@@ -44,7 +50,8 @@ def render():
                 pass
 
         # Daily Progress Summary Card
-        st.markdown(f"""
+        st.markdown(
+            f"""
             <div class='glass-card bento-header'>
                 <h4 style='margin:0; color:#5E6AD2;'>Daily Nutrition Scorecard</h4>
                 <div style='display: flex; gap: 40px; margin-top: 15px;'>
@@ -66,7 +73,9 @@ def render():
                     </div>
                 </div>
             </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
         # Logged meals list
         st.subheader("Today's Logged Meals")
@@ -74,23 +83,23 @@ def render():
             for m in meals:
                 with st.expander(f"🍴 {m.meal_type.upper()} — {m.meal_date}", expanded=True):
                     entries = nutrition_service.get_meal_entries(m.meal_id)
-                    
+
                     if entries:
                         # Show food items table
                         for entry in entries:
                             food = nutrition_service.get_food_item(entry.food_id)
                             food_name = food.name if food else "Unknown Food"
-                            
+
                             # calculate entry scaling
                             serving = food.serving_size_g if food else 100.0
                             scale = entry.quantity_g / serving
                             entry_cals = (food.calories * scale) if food else 0
-                            
+
                             col_n, col_q, col_c, col_d = st.columns([4, 2, 2, 1])
                             col_n.write(f"**{food_name}**")
                             col_q.write(f"{entry.quantity_g:.0f}g")
                             col_c.write(f"{entry_cals:.0f} kcal")
-                            
+
                             # Delete entry
                             if col_d.button("🗑️", key=f"del_ent_{entry.entry_id}"):
                                 try:
@@ -109,16 +118,25 @@ def render():
                     st.markdown("**Add Food Item to Meal**")
                     foods = nutrition_service.list_food_database()
                     if foods:
-                        food_options = {f.food_id: f"{f.name} ({f.calories:.0f}kcal / {f.serving_size_g:.0f}g)" for f in foods}
-                        selected_food_id = st.selectbox("Select Food", options=list(food_options.keys()), key=f"sel_food_{m.meal_id}", format_func=lambda x: food_options[x])
-                        qty = st.number_input("Quantity (grams)", min_value=1.0, value=100.0, step=10.0, key=f"qty_{m.meal_id}")
+                        food_options = {
+                            f.food_id: f"{f.name} ({f.calories:.0f}kcal / {f.serving_size_g:.0f}g)" for f in foods
+                        }
+                        selected_food_id = st.selectbox(
+                            "Select Food",
+                            options=list(food_options.keys()),
+                            key=f"sel_food_{m.meal_id}",
+                            format_func=lambda x, fo=food_options: fo[x],
+                        )
+                        qty = st.number_input(
+                            "Quantity (grams)", min_value=1.0, value=100.0, step=10.0, key=f"qty_{m.meal_id}"
+                        )
                         if st.button("Add to Meal", key=f"btn_add_{m.meal_id}"):
                             try:
                                 new_entry = MealEntry(
                                     entry_id=f"ent-{uuid.uuid4().hex[:8]}",
                                     meal_id=m.meal_id,
                                     food_id=selected_food_id,
-                                    quantity_g=qty
+                                    quantity_g=qty,
                                 )
                                 nutrition_service.add_food_to_meal(new_entry)
                                 # Save daily log calculation
@@ -150,7 +168,9 @@ def render():
         if st.button("Create Meal Event"):
             try:
                 # Ensure user doesn't log duplicate meal type per date
-                existing = nutrition_service.meal_repo.get_meal_by_type_and_date(user_id, selected_meal_type, selected_date)
+                existing = nutrition_service.meal_repo.get_meal_by_type_and_date(
+                    user_id, selected_meal_type, selected_date
+                )
                 if existing:
                     st.warning(f"You have already created a '{selected_meal_type}' meal event for this date.")
                 else:
@@ -158,7 +178,7 @@ def render():
                         meal_id=f"meal-{uuid.uuid4().hex[:8]}",
                         user_id=user_id,
                         meal_type=selected_meal_type,
-                        meal_date=selected_date
+                        meal_date=selected_date,
                     )
                     nutrition_service.create_meal(new_meal)
                     st.success(f"{selected_meal_type.upper()} meal event created!")
@@ -170,17 +190,20 @@ def render():
     with tab_food_db:
         st.subheader("Food Item Database Library")
         foods = nutrition_service.list_food_database()
-        
+
         if foods:
             for f in foods:
-                st.markdown(f"""
+                st.markdown(
+                    f"""
                     <div class='glass-card'>
                         <h4 style='margin:0; color:#818CF8;'>{f.name}</h4>
                         <p style='margin:0; font-size:0.85rem; color:#94a3b8;'>
                             {f.calories:.0f} kcal per {f.serving_size_g:.0f}g | P: {f.protein:.1f}g | C: {f.carbs:.1f}g | F: {f.fats:.1f}g
                         </p>
                     </div>
-                """, unsafe_allow_html=True)
+                """,
+                    unsafe_allow_html=True,
+                )
         else:
             st.info("Food catalog database is currently empty.")
 
@@ -193,7 +216,7 @@ def render():
             f_carbs = st.number_input("Carbohydrates (grams per serving)", min_value=0.0, value=1.1)
             f_fats = st.number_input("Fats (grams per serving)", min_value=0.0, value=11.0)
             f_serving = st.number_input("Serving Size (grams)", min_value=1.0, value=100.0)
-            
+
             f_submit = st.form_submit_button("Register Food Item")
             if f_submit:
                 try:
@@ -204,7 +227,7 @@ def render():
                         protein=f_protein,
                         carbs=f_carbs,
                         fats=f_fats,
-                        serving_size_g=f_serving
+                        serving_size_g=f_serving,
                     )
                     nutrition_service.add_food_item(new_food)
                     st.success(f"Added {f_name} to database library!")

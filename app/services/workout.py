@@ -1,17 +1,16 @@
 from datetime import datetime
-from typing import Optional, List
+
+from app.core.exceptions import ServiceError, ValidationError
+from app.core.logging import logger
+from app.models.workout import ExerciseLog, ExerciseSet, TrainingSplit, WorkoutPlan, WorkoutSession
+from app.repositories.exercise import ExerciseRepository
+from app.repositories.user import UserRepository
 from app.repositories.workout import (
+    ExerciseLogRepository,
+    ExerciseSetRepository,
     WorkoutPlanRepository,
     WorkoutSessionRepository,
-    ExerciseLogRepository,
-    ExerciseSetRepository
 )
-from app.repositories.user import UserRepository
-from app.repositories.exercise import ExerciseRepository
-from app.models.workout import WorkoutPlan, WorkoutSession, ExerciseLog, ExerciseSet, TrainingSplit
-from app.core.exceptions import ValidationError, ServiceError
-from app.core.logging import logger
-from app.database.connection import db_manager
 
 
 class WorkoutService:
@@ -19,12 +18,12 @@ class WorkoutService:
 
     def __init__(
         self,
-        plan_repo: Optional[WorkoutPlanRepository] = None,
-        session_repo: Optional[WorkoutSessionRepository] = None,
-        log_repo: Optional[ExerciseLogRepository] = None,
-        set_repo: Optional[ExerciseSetRepository] = None,
-        user_repo: Optional[UserRepository] = None,
-        exercise_repo: Optional[ExerciseRepository] = None
+        plan_repo: WorkoutPlanRepository | None = None,
+        session_repo: WorkoutSessionRepository | None = None,
+        log_repo: ExerciseLogRepository | None = None,
+        set_repo: ExerciseSetRepository | None = None,
+        user_repo: UserRepository | None = None,
+        exercise_repo: ExerciseRepository | None = None,
     ):
         self.plan_repo = plan_repo or WorkoutPlanRepository()
         self.session_repo = session_repo or WorkoutSessionRepository()
@@ -38,7 +37,7 @@ class WorkoutService:
     def create_workout_plan(self, plan: WorkoutPlan) -> str:
         """Validates split parameters and creates a new workout plan."""
         logger.info(f"Creating workout plan: {plan.name} for user: {plan.user_id}")
-        
+
         if not plan.name.strip():
             raise ValidationError("Workout plan name cannot be empty.")
 
@@ -47,7 +46,7 @@ class WorkoutService:
         if plan.split_name not in valid_splits:
             raise ValidationError(
                 message="Workout plan creation failed: Invalid training split.",
-                details=f"Split: {plan.split_name}. Must be one of: {valid_splits}"
+                details=f"Split: {plan.split_name}. Must be one of: {valid_splits}",
             )
 
         # Verify user exists (Data Integrity Rule)
@@ -57,10 +56,10 @@ class WorkoutService:
         try:
             return self.plan_repo.create_plan(plan)
         except Exception as e:
-            logger.error(f"Failed to create workout plan: {str(e)}")
+            logger.error(f"Failed to create workout plan: {e!s}")
             raise ServiceError("Workout plan creation failed.", details=str(e))
 
-    def get_user_plans(self, user_id: str) -> List[WorkoutPlan]:
+    def get_user_plans(self, user_id: str) -> list[WorkoutPlan]:
         """Retrieves all plans configured for a user."""
         return self.plan_repo.get_user_plans(user_id)
 
@@ -72,7 +71,7 @@ class WorkoutService:
 
     # --- Workout Session Lifecycle ---
 
-    def start_session(self, session_id: str, user_id: str, plan_id: Optional[str] = None) -> str:
+    def start_session(self, session_id: str, user_id: str, plan_id: str | None = None) -> str:
         """Transitions user state from NOT_STARTED to ACTIVE and boots a session tracker."""
         logger.info(f"Attempting to start workout session for user: {user_id}")
 
@@ -90,7 +89,7 @@ class WorkoutService:
             logger.warning(f"Start rejected: User {user_id} already has an active session: {active.session_id}")
             raise ValidationError(
                 message="Cannot start workout session: User already has an active workout session running.",
-                details=f"Active session ID: {active.session_id}"
+                details=f"Active session ID: {active.session_id}",
             )
 
         new_session = WorkoutSession(
@@ -99,19 +98,19 @@ class WorkoutService:
             plan_id=plan_id,
             start_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             end_time=None,
-            status="ACTIVE"
+            status="ACTIVE",
         )
 
         try:
             return self.session_repo.create_session(new_session)
         except Exception as e:
-            logger.error(f"Failed to create workout session: {str(e)}")
+            logger.error(f"Failed to create workout session: {e!s}")
             raise ServiceError("Failed to start workout session.", details=str(e))
 
     def pause_session(self, session_id: str) -> None:
         """Transitions state from ACTIVE to PAUSED."""
         logger.info(f"Pausing workout session: {session_id}")
-        
+
         session = self.session_repo.get_session(session_id)
         if not session:
             raise ValidationError(f"Workout session {session_id} not found.")
@@ -120,7 +119,7 @@ class WorkoutService:
         if session.status != "ACTIVE":
             raise ValidationError(
                 message="Invalid state transition: Can only pause an ACTIVE session.",
-                details=f"Current status: {session.status}"
+                details=f"Current status: {session.status}",
             )
 
         self.session_repo.update_session(session_id, {"status": "PAUSED"})
@@ -129,7 +128,7 @@ class WorkoutService:
     def resume_session(self, session_id: str) -> None:
         """Transitions state from PAUSED to ACTIVE."""
         logger.info(f"Resuming workout session: {session_id}")
-        
+
         session = self.session_repo.get_session(session_id)
         if not session:
             raise ValidationError(f"Workout session {session_id} not found.")
@@ -138,16 +137,16 @@ class WorkoutService:
         if session.status != "PAUSED":
             raise ValidationError(
                 message="Invalid state transition: Can only resume a PAUSED session.",
-                details=f"Current status: {session.status}"
+                details=f"Current status: {session.status}",
             )
 
         self.session_repo.update_session(session_id, {"status": "ACTIVE"})
         logger.info(f"Session {session_id} resumed.")
 
-    def end_session(self, session_id: str, calories_burned: float = 0.0, avg_hr: Optional[int] = None) -> None:
+    def end_session(self, session_id: str, calories_burned: float = 0.0, avg_hr: int | None = None) -> None:
         """Transitions session to COMPLETED and sets final attributes. COMPLETED is final."""
         logger.info(f"Ending workout session: {session_id}")
-        
+
         session = self.session_repo.get_session(session_id)
         if not session:
             raise ValidationError(f"Workout session {session_id} not found.")
@@ -155,7 +154,7 @@ class WorkoutService:
         if session.status not in ("ACTIVE", "PAUSED"):
             raise ValidationError(
                 message="Invalid state transition: Cannot end a session that is already completed or not started.",
-                details=f"Current status: {session.status}"
+                details=f"Current status: {session.status}",
             )
 
         if calories_burned < 0:
@@ -167,7 +166,7 @@ class WorkoutService:
             "status": "COMPLETED",
             "end_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "calories_burned_kcal": calories_burned,
-            "avg_heart_rate": avg_hr
+            "avg_heart_rate": avg_hr,
         }
         self.session_repo.update_session(session_id, updates)
         logger.info(f"Session {session_id} completed successfully.")
@@ -195,19 +194,15 @@ class WorkoutService:
         if duplicate:
             raise ValidationError(
                 message="Exercise log already exists for this exercise in this session.",
-                details=f"Exercise log ID: {duplicate.exercise_log_id}"
+                details=f"Exercise log ID: {duplicate.exercise_log_id}",
             )
 
-        new_log = ExerciseLog(
-            exercise_log_id=exercise_log_id,
-            session_id=session_id,
-            exercise_id=exercise_id
-        )
+        new_log = ExerciseLog(exercise_log_id=exercise_log_id, session_id=session_id, exercise_id=exercise_id)
 
         try:
             return self.log_repo.create_log(new_log)
         except Exception as e:
-            logger.error(f"Failed to add exercise log: {str(e)}")
+            logger.error(f"Failed to add exercise log: {e!s}")
             raise ServiceError("Failed to add exercise to session.", details=str(e))
 
     def log_set(
@@ -218,7 +213,7 @@ class WorkoutService:
         set_number: int,
         weight: float,
         reps: int,
-        rpe: Optional[float] = None
+        rpe: float | None = None,
     ) -> str:
         """Logs a set performance under the exercise log inside an active session."""
         logger.info(f"Logging set {set_number} under log {exercise_log_id}")
@@ -251,7 +246,7 @@ class WorkoutService:
         if duplicate:
             raise ValidationError(
                 message="A set record with this set number already exists under this exercise log.",
-                details=f"Duplicate Set ID: {duplicate.set_id}"
+                details=f"Duplicate Set ID: {duplicate.set_id}",
             )
 
         new_set = ExerciseSet(
@@ -262,19 +257,19 @@ class WorkoutService:
             weight=weight,
             reps=reps,
             rpe=rpe,
-            is_completed=False
+            is_completed=False,
         )
 
         try:
             return self.set_repo.create_set(new_set)
         except Exception as e:
-            logger.error(f"Failed to create set: {str(e)}")
+            logger.error(f"Failed to create set: {e!s}")
             raise ServiceError("Failed to log set.", details=str(e))
 
     def update_set_completion(self, set_id: str, is_completed: bool) -> None:
         """Marks set completion status."""
         logger.info(f"Updating set completion status for: {set_id} to: {is_completed}")
-        
+
         set_obj = self.set_repo.get_set(set_id)
         if not set_obj:
             raise ValidationError(f"Set record {set_id} not found.")

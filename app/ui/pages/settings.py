@@ -1,21 +1,28 @@
-import streamlit as st
 import uuid
-from app.services.user import UserService
+
+import streamlit as st
+
 from app.models.domain import User, UserProfile
-from app.repositories.user import UserRepository
+from app.services.user import UserService
+
 
 def render():
-    st.markdown("""
+    st.markdown(
+        """
         <div style='margin-bottom: 24px;'>
             <h1 class='gradient-text' style='font-size: 2.2rem; margin-bottom: 4px;'>Settings & Profiles</h1>
             <p style='color: #94a3b8; font-size: 0.95rem; margin: 0;'>Manage user profiles, physical baselines, and configuration parameters.</p>
         </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
     user_id = st.session_state.current_user_id
     user_service = UserService()
 
-    tab_active, tab_register, tab_system = st.tabs(["👤 Active Profile", "➕ Register Profile", "⚙️ System Configuration"])
+    tab_active, tab_register, tab_system = st.tabs(
+        ["👤 Active Profile", "➕ Register Profile", "⚙️ System Configuration"]
+    )
 
     # --- TAB 1: Active Profile details ---
     with tab_active:
@@ -24,17 +31,21 @@ def render():
                 res = user_service.get_user_and_profile(user_id)
             except Exception:
                 res = None
-                
+
             if res:
                 user_obj, profile_obj = res
-                st.markdown(f"""
+                st.markdown(
+                    f"""
                     <div class='glass-card bento-header'>
                         <h3 style='margin:0; color:#5E6AD2;'>{user_obj.name}</h3>
                         <p style='margin:0; font-size:0.9rem; color:#A5B4FC;'>{user_obj.email}</p>
                     </div>
-                """, unsafe_allow_html=True)
+                """,
+                    unsafe_allow_html=True,
+                )
 
-                st.markdown(f"""
+                st.markdown(
+                    f"""
                     <div class='glass-card'>
                         <h4 style='margin:0 0 10px 0; color:#E2E8F0;'>Physical Profile Stats</h4>
                         <div style='display:flex; gap:40px;'>
@@ -52,8 +63,10 @@ def render():
                             </div>
                         </div>
                     </div>
-                """, unsafe_allow_html=True)
-                
+                """,
+                    unsafe_allow_html=True,
+                )
+
                 # Delete profile button
                 if st.button("Delete Active Profile", use_container_width=True):
                     try:
@@ -77,7 +90,7 @@ def render():
             reg_birth = st.date_input("Birth Date")
             reg_height = st.number_input("Height (cm)", min_value=50.0, max_value=250.0, value=175.0, step=1.0)
             reg_weight = st.number_input("Weight (kg)", min_value=20.0, max_value=250.0, value=70.0, step=0.5)
-            
+
             submit_reg = st.form_submit_button("Create Profile", use_container_width=True)
             if submit_reg:
                 if not reg_name.strip() or not reg_email.strip():
@@ -85,18 +98,14 @@ def render():
                 else:
                     try:
                         new_uid = f"usr-{uuid.uuid4().hex[:8]}"
-                        new_user = User(
-                            user_id=new_uid,
-                            name=reg_name.strip(),
-                            email=reg_email.strip()
-                        )
+                        new_user = User(user_id=new_uid, name=reg_name.strip(), email=reg_email.strip())
                         new_profile = UserProfile(
                             user_id=new_uid,
                             birth_date=reg_birth.strftime("%Y-%m-%d"),
                             weight_kg=reg_weight,
-                            height_cm=reg_height
+                            height_cm=reg_height,
                         )
-                        
+
                         user_service.register_user(new_user, new_profile)
                         st.session_state.current_user_id = new_uid
                         st.success(f"Profile for {reg_name} registered successfully!")
@@ -108,8 +117,9 @@ def render():
     with tab_system:
         st.subheader("System Status Parameters")
         from app.core.config import settings
-        
-        st.markdown(f"""
+
+        st.markdown(
+            f"""
             <div class='glass-card'>
                 <h4 style='margin:0 0 10px 0; color:#E2E8F0;'>Active Environments</h4>
                 <div style='display:flex; flex-direction:column; gap:8px;'>
@@ -131,4 +141,6 @@ def render():
                     </div>
                 </div>
             </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )

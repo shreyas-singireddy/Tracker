@@ -1,6 +1,5 @@
-from typing import Optional, List
-from app.repositories.base import BaseRepository
 from app.models.domain import Exercise
+from app.repositories.base import BaseRepository
 
 
 class ExerciseRepository(BaseRepository):
@@ -11,7 +10,7 @@ class ExerciseRepository(BaseRepository):
         self.create("exercises", exercise.to_dict())
         return exercise.exercise_id
 
-    def get_exercise(self, exercise_id: str) -> Optional[Exercise]:
+    def get_exercise(self, exercise_id: str) -> Exercise | None:
         """Fetches an Exercise object by its exercise_id."""
         row = self.read("exercises", "exercise_id", exercise_id)
         return Exercise.from_dict(row) if row else None
@@ -24,7 +23,7 @@ class ExerciseRepository(BaseRepository):
         """Deletes an exercise record."""
         return self.delete("exercises", "exercise_id", exercise_id)
 
-    def list_exercises(self) -> List[Exercise]:
+    def list_exercises(self) -> list[Exercise]:
         """Lists all exercises."""
         rows = self.list_all("exercises")
         return [Exercise.from_dict(row) for row in rows]

@@ -1,14 +1,12 @@
 """AIModule standardization interface wrapper for FitOS (Sprint 10)."""
-from typing import Dict, Any
-from app.modules.base import BaseModule
-from app.services.ai_coach import AICoachService
-from app.repositories.ai import (
-    AISessionRepository,
-    AIQueryRepository,
-    AIResponseRepository,
-    AIRecommendationRepository
-)
+
+from typing import Any
+
 from app.database.connection import db_manager
+from app.modules.base import BaseModule
+from app.repositories.ai import AIQueryRepository, AIRecommendationRepository, AIResponseRepository, AISessionRepository
+from app.services.ai_coach import AICoachService
+
 
 class AIModule(BaseModule):
     """Encapsulates AI Coach domain logic interfaces."""
@@ -29,21 +27,21 @@ class AIModule(BaseModule):
             session_repo=self.session_repo,
             query_repo=self.query_repo,
             response_repo=self.response_repo,
-            rec_repo=self.rec_repo
+            rec_repo=self.rec_repo,
         )
 
-    def get_services(self) -> Dict[str, Any]:
+    def get_services(self) -> dict[str, Any]:
         return {"AICoachService": self.service}
 
-    def get_repositories(self) -> Dict[str, Any]:
+    def get_repositories(self) -> dict[str, Any]:
         return {
             "AISessionRepository": self.session_repo,
             "AIQueryRepository": self.query_repo,
             "AIResponseRepository": self.response_repo,
-            "AIRecommendationRepository": self.rec_repo
+            "AIRecommendationRepository": self.rec_repo,
         }
 
-    def health_check(self) -> Dict[str, Any]:
+    def health_check(self) -> dict[str, Any]:
         try:
             db_manager.execute_read("SELECT 1 FROM ai_sessions LIMIT 1;")
             db_manager.execute_read("SELECT 1 FROM ai_queries LIMIT 1;")
@@ -51,4 +49,4 @@ class AIModule(BaseModule):
             db_manager.execute_read("SELECT 1 FROM ai_recommendations LIMIT 1;")
             return {"status": "GREEN", "details": "AI module tables are readable."}
         except Exception as e:
-            return {"status": "RED", "details": f"AI health check failed: {str(e)}"}
+            return {"status": "RED", "details": f"AI health check failed: {e!s}"}

@@ -2,22 +2,24 @@
 # Multi-stage Docker build for portable offline deployment
 # No external API dependencies — runs entirely offline
 
-# ---- Stage 1: Base ----
-FROM python:3.11-slim AS base
+# ---- Stage 1: Builder ----
+FROM python:3.11-slim AS builder
 
-WORKDIR /app
+WORKDIR /build
 
-# Copy only requirements first for layer caching
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --user -r requirements.txt
 
 # ---- Stage 2: Runtime ----
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install only streamlit (SQLite is stdlib)
-RUN pip install --no-cache-dir streamlit==1.38.0
+# Copy installed packages from builder
+COPY --from=builder /root/.local /root/.local
+
+# Make sure scripts in .local are usable:
+ENV PATH=/root/.local/bin:$PATH
 
 # Copy application code
 COPY . .

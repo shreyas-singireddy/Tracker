@@ -2,9 +2,10 @@ import os
 import sqlite3
 import unittest
 from pathlib import Path
+
+from app.core.exceptions import DatabaseError
 from app.database.connection import DatabaseManager
 from app.database.migrations import MigrationRunner
-from app.core.exceptions import DatabaseError
 
 TEST_DB_PATH = Path(__file__).resolve().parent / "test_fitos.db"
 
@@ -15,7 +16,7 @@ class TestDatabaseManager(unittest.TestCase):
     def setUp(self):
         # Initialize database manager targeting a temporary test file
         self.db = DatabaseManager(db_path=str(TEST_DB_PATH))
-        
+
         # Create a simple test table for database validation
         self.db.execute_write("CREATE TABLE IF NOT EXISTS test_users (id INTEGER PRIMARY KEY, name TEXT);")
 
@@ -46,7 +47,7 @@ class TestDatabaseManager(unittest.TestCase):
         """Verifies that queries grouped in a transaction rollback completely if any step raises an error."""
         # Insert a valid starting record
         self.db.execute_write("INSERT INTO test_users (name) VALUES (?);", ("Bob",))
-        
+
         # Run transaction block with an intentional error
         try:
             with self.db.transaction() as conn:

@@ -1,9 +1,10 @@
 import os
 import unittest
 from pathlib import Path
+
+from app.core.exceptions import RepositoryError
 from app.database.connection import DatabaseManager
 from app.repositories.base import BaseRepository
-from app.core.exceptions import RepositoryError
 
 TEST_REPO_DB_PATH = Path(__file__).resolve().parent / "test_fitos_repo.db"
 
@@ -14,7 +15,7 @@ class TestBaseRepository(unittest.TestCase):
     def setUp(self):
         self.db = DatabaseManager(db_path=str(TEST_REPO_DB_PATH))
         self.repo = BaseRepository(db=self.db)
-        
+
         # Initialize schema table
         self.db.execute_write(
             "CREATE TABLE IF NOT EXISTS test_items (item_id TEXT PRIMARY KEY, title TEXT, quantity INTEGER);"
@@ -34,11 +35,11 @@ class TestBaseRepository(unittest.TestCase):
 
     def test_crud_lifecycle(self):
         """Verifies the complete creation, retrieval, updating, and deletion cycle."""
-        
+
         # 1. Create (Insert)
         item_data = {"item_id": "itm-01", "title": "Resistance Band", "quantity": 5}
         self.repo.create("test_items", item_data)
-        
+
         # 2. Read (Select Single)
         row = self.repo.read("test_items", "item_id", "itm-01")
         self.assertIsNotNone(row)

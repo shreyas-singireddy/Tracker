@@ -8,20 +8,21 @@ Tests cover:
   5. Validation failures (all boundary cases raise ValidationError)
   6. Daily summary (get_nutrition_summary structure, save_daily_nutrition_log)
 """
+
 import os
 import unittest
-from pathlib import Path
 from datetime import date, timedelta
+from pathlib import Path
 
+from app.core.exceptions import ValidationError
 from app.database.connection import DatabaseManager
 from app.database.migrations import MigrationRunner
-from app.models.domain import User, FoodItem
-from app.models.nutrition import Meal, MealEntry, MealType, NutritionLog
-from app.repositories.user import UserRepository
+from app.models.domain import FoodItem, User
+from app.models.nutrition import Meal, MealEntry
 from app.repositories.food import FoodRepository
-from app.repositories.nutrition import MealRepository, MealEntryRepository, NutritionLogRepository
+from app.repositories.nutrition import MealEntryRepository, MealRepository, NutritionLogRepository
+from app.repositories.user import UserRepository
 from app.services.nutrition import NutritionService
-from app.core.exceptions import ValidationError, ServiceError
 
 TEST_DB_PATH = Path(__file__).resolve().parent / "test_fitos_s4.db"
 MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "app" / "database" / "migrations"
@@ -136,8 +137,7 @@ class TestSprint4NutritionEngine(unittest.TestCase):
     def test_food_add_via_service(self):
         """NutritionService.add_food_item validates and persists a new food."""
         apple = FoodItem(
-            food_id="f-apple", name="Apple", calories=52.0,
-            protein=0.3, carbs=14.0, fats=0.2, serving_size_g=100.0
+            food_id="f-apple", name="Apple", calories=52.0, protein=0.3, carbs=14.0, fats=0.2, serving_size_g=100.0
         )
         returned_id = self.nutrition.add_food_item(apple)
         self.assertEqual(returned_id, "f-apple")
@@ -205,8 +205,8 @@ class TestSprint4NutritionEngine(unittest.TestCase):
     def test_get_meals_for_date(self):
         """get_meals_for_date returns only meals on the requested date."""
         m1 = Meal(meal_id="m-d1", user_id="u-n4", meal_type="breakfast", meal_date=TODAY)
-        m2 = Meal(meal_id="m-d2", user_id="u-n4", meal_type="lunch",     meal_date=TODAY)
-        m3 = Meal(meal_id="m-d3", user_id="u-n4", meal_type="dinner",    meal_date=YESTERDAY)
+        m2 = Meal(meal_id="m-d2", user_id="u-n4", meal_type="lunch", meal_date=TODAY)
+        m3 = Meal(meal_id="m-d3", user_id="u-n4", meal_type="dinner", meal_date=YESTERDAY)
         for m in (m1, m2, m3):
             self.nutrition.create_meal(m)
         today_meals = self.nutrition.get_meals_for_date("u-n4", TODAY)
@@ -302,14 +302,14 @@ class TestSprint4NutritionEngine(unittest.TestCase):
             MealEntry(entry_id="ec-1", meal_id="m-calc", food_id="f-chicken", quantity_g=150.0)
         )
         self.nutrition.add_food_to_meal(
-            MealEntry(entry_id="ec-2", meal_id="m-calc", food_id="f-rice",    quantity_g=200.0)
+            MealEntry(entry_id="ec-2", meal_id="m-calc", food_id="f-rice", quantity_g=200.0)
         )
 
         macros = self.nutrition.calculate_meal_macros("m-calc")
-        self.assertAlmostEqual(macros.calories,  679.5, places=2)
-        self.assertAlmostEqual(macros.protein_g,  56.5, places=2)
-        self.assertAlmostEqual(macros.carbs_g,    90.0, places=2)
-        self.assertAlmostEqual(macros.fat_g,       9.0, places=2)
+        self.assertAlmostEqual(macros.calories, 679.5, places=2)
+        self.assertAlmostEqual(macros.protein_g, 56.5, places=2)
+        self.assertAlmostEqual(macros.carbs_g, 90.0, places=2)
+        self.assertAlmostEqual(macros.fat_g, 9.0, places=2)
 
     def test_calculate_daily_macros(self):
         """Daily macros aggregate across multiple meals on the same date.
@@ -324,21 +324,21 @@ class TestSprint4NutritionEngine(unittest.TestCase):
             fat      = 3.6 + 1.8 = 5.4
         """
         m_b = Meal(meal_id="m-day-b", user_id="u-n4", meal_type="breakfast", meal_date=TODAY)
-        m_d = Meal(meal_id="m-day-d", user_id="u-n4", meal_type="dinner",    meal_date=TODAY)
+        m_d = Meal(meal_id="m-day-d", user_id="u-n4", meal_type="dinner", meal_date=TODAY)
         self.nutrition.create_meal(m_b)
         self.nutrition.create_meal(m_d)
         self.nutrition.add_food_to_meal(
             MealEntry(entry_id="ed-1", meal_id="m-day-b", food_id="f-chicken", quantity_g=100.0)
         )
         self.nutrition.add_food_to_meal(
-            MealEntry(entry_id="ed-2", meal_id="m-day-d", food_id="f-rice",    quantity_g=100.0)
+            MealEntry(entry_id="ed-2", meal_id="m-day-d", food_id="f-rice", quantity_g=100.0)
         )
 
         daily = self.nutrition.calculate_daily_macros("u-n4", TODAY)
-        self.assertAlmostEqual(daily.calories,  381.0, places=2)
-        self.assertAlmostEqual(daily.protein_g,  36.0, places=2)
-        self.assertAlmostEqual(daily.carbs_g,    45.0, places=2)
-        self.assertAlmostEqual(daily.fat_g,       5.4, places=2)
+        self.assertAlmostEqual(daily.calories, 381.0, places=2)
+        self.assertAlmostEqual(daily.protein_g, 36.0, places=2)
+        self.assertAlmostEqual(daily.carbs_g, 45.0, places=2)
+        self.assertAlmostEqual(daily.fat_g, 5.4, places=2)
 
     def test_empty_meal_macros_are_zero(self):
         """A meal with no entries returns all-zero MacroProfile."""
@@ -383,16 +383,14 @@ class TestSprint4NutritionEngine(unittest.TestCase):
         """save_daily_nutrition_log persists totals and get_daily_nutrition_log retrieves them."""
         meal = Meal(meal_id="m-log", user_id="u-n4", meal_type="breakfast", meal_date=TODAY)
         self.nutrition.create_meal(meal)
-        self.nutrition.add_food_to_meal(
-            MealEntry(entry_id="el-1", meal_id="m-log", food_id="f-rice", quantity_g=100.0)
-        )
+        self.nutrition.add_food_to_meal(MealEntry(entry_id="el-1", meal_id="m-log", food_id="f-rice", quantity_g=100.0))
         saved = self.nutrition.save_daily_nutrition_log("log-1", "u-n4", TODAY)
         self.assertAlmostEqual(saved.total_calories, 216.0, places=2)
 
         retrieved = self.nutrition.get_daily_nutrition_log("u-n4", TODAY)
         self.assertIsNotNone(retrieved)
         self.assertAlmostEqual(retrieved.total_calories, 216.0, places=2)
-        self.assertAlmostEqual(retrieved.total_carbs,     45.0, places=2)
+        self.assertAlmostEqual(retrieved.total_carbs, 45.0, places=2)
 
     def test_save_log_upserts_on_recompute(self):
         """Calling save_daily_nutrition_log twice on the same day upserts (no duplicate error)."""
@@ -403,9 +401,7 @@ class TestSprint4NutritionEngine(unittest.TestCase):
         )
         self.nutrition.save_daily_nutrition_log("log-ups", "u-n4", TODAY)
         # Add more food and recompute — should NOT raise a UNIQUE error
-        self.nutrition.add_food_to_meal(
-            MealEntry(entry_id="eu-2", meal_id="m-ups", food_id="f-rice", quantity_g=100.0)
-        )
+        self.nutrition.add_food_to_meal(MealEntry(entry_id="eu-2", meal_id="m-ups", food_id="f-rice", quantity_g=100.0))
         saved = self.nutrition.save_daily_nutrition_log("log-ups", "u-n4", TODAY)
         self.assertAlmostEqual(saved.total_calories, 165.0 + 216.0, places=2)
 

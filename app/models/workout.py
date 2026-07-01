@@ -1,6 +1,6 @@
-from dataclasses import dataclass, asdict
-from typing import Any, Dict, List, Optional
+from dataclasses import asdict, dataclass
 from enum import Enum
+from typing import Any
 
 
 class TrainingSplit(str, Enum):
@@ -18,21 +18,21 @@ class WorkoutPlan:
     user_id: str
     name: str
     split_name: str  # Push, Pull, Legs, etc.
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WorkoutPlan":
+    def from_dict(cls, data: dict[str, Any]) -> "WorkoutPlan":
         return cls(
             plan_id=data["plan_id"],
             user_id=data["user_id"],
             name=data["name"],
             split_name=data["split_name"],
             created_at=data.get("created_at"),
-            updated_at=data.get("updated_at")
+            updated_at=data.get("updated_at"),
         )
 
 
@@ -40,20 +40,20 @@ class WorkoutPlan:
 class WorkoutSession:
     session_id: str
     user_id: str
-    plan_id: Optional[str]
+    plan_id: str | None
     start_time: str
-    end_time: Optional[str]
+    end_time: str | None
     status: str  # 'NOT_STARTED', 'ACTIVE', 'PAUSED', 'COMPLETED'
     calories_burned_kcal: float = 0.0
-    avg_heart_rate: Optional[int] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    avg_heart_rate: int | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WorkoutSession":
+    def from_dict(cls, data: dict[str, Any]) -> "WorkoutSession":
         return cls(
             session_id=data["session_id"],
             user_id=data["user_id"],
@@ -64,7 +64,7 @@ class WorkoutSession:
             calories_burned_kcal=float(data.get("calories_burned_kcal", 0.0)),
             avg_heart_rate=data.get("avg_heart_rate"),
             created_at=data.get("created_at"),
-            updated_at=data.get("updated_at")
+            updated_at=data.get("updated_at"),
         )
 
 
@@ -73,20 +73,20 @@ class ExerciseLog:
     exercise_log_id: str
     session_id: str
     exercise_id: str
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ExerciseLog":
+    def from_dict(cls, data: dict[str, Any]) -> "ExerciseLog":
         return cls(
             exercise_log_id=data["exercise_log_id"],
             session_id=data["session_id"],
             exercise_id=data["exercise_id"],
             created_at=data.get("created_at"),
-            updated_at=data.get("updated_at")
+            updated_at=data.get("updated_at"),
         )
 
 
@@ -98,12 +98,12 @@ class ExerciseSet:
     set_number: int
     weight: float
     reps: int
-    rpe: Optional[float] = None  # Rate of Perceived Exertion
+    rpe: float | None = None  # Rate of Perceived Exertion
     is_completed: bool = False
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         # We need to manually handle boolean to integer translation for SQLite storage if using generic helpers,
         # but to_dict handles dict representation.
         d = asdict(self)
@@ -111,7 +111,7 @@ class ExerciseSet:
         return d
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ExerciseSet":
+    def from_dict(cls, data: dict[str, Any]) -> "ExerciseSet":
         raw_completed = data.get("is_completed", False)
         # Handle SQLite integer boolean representation (0 or 1)
         is_completed = raw_completed in (1, True, "True", "1")
@@ -125,5 +125,5 @@ class ExerciseSet:
             rpe=float(data["rpe"]) if data.get("rpe") is not None else None,
             is_completed=is_completed,
             created_at=data.get("created_at"),
-            updated_at=data.get("updated_at")
+            updated_at=data.get("updated_at"),
         )

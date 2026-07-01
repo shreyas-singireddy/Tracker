@@ -10,33 +10,30 @@ Test classes:
   5. TestAIDBLogging          — session, query, response, recommendation CRUD
   6. TestResponseValidation   — explainability: rule_source always set
 """
+
 import os
 import uuid
-import pytest
 from datetime import date, timedelta
 from pathlib import Path
 
+import pytest
+
+from app.core.exceptions import ValidationError
 from app.database.connection import DatabaseManager
 from app.database.migrations import MigrationRunner
-from app.models.domain import User
 from app.models.ai import (
     IntentCategory,
-    RecommendationCategory,
     RecommendationPriority,
-    AICoachSession,
-    AIQuery,
-    AIResponse,
-    Recommendation,
+)
+from app.models.domain import User
+from app.repositories.ai import (
+    AIQueryRepository,
+    AIRecommendationRepository,
+    AIResponseRepository,
+    AISessionRepository,
 )
 from app.repositories.user import UserRepository
-from app.repositories.ai import (
-    AISessionRepository,
-    AIQueryRepository,
-    AIResponseRepository,
-    AIRecommendationRepository,
-)
 from app.services.ai_coach import AICoachService
-from app.core.exceptions import ValidationError
 
 # ---------------------------------------------------------------------------
 # Test DB setup
@@ -103,13 +100,15 @@ def session_id(coach, user_id):
 # 1. Intent Classifier Tests
 # ---------------------------------------------------------------------------
 
-class TestIntentClassifier:
 
+class TestIntentClassifier:
     def test_nutrition_keywords_classify_correctly(self, coach):
         assert coach.classify_intent("I need meal protein calorie advice") == IntentCategory.NUTRITION_QUERY.value
 
     def test_workout_keywords_classify_correctly(self, coach):
-        assert coach.classify_intent("How many sets and reps should I lift today?") == IntentCategory.WORKOUT_QUERY.value
+        assert (
+            coach.classify_intent("How many sets and reps should I lift today?") == IntentCategory.WORKOUT_QUERY.value
+        )
 
     def test_recovery_keywords_classify_correctly(self, coach):
         assert coach.classify_intent("I didn't sleep well and feel fatigue") == IntentCategory.RECOVERY_QUERY.value
@@ -146,18 +145,26 @@ class TestIntentClassifier:
 # 2. Context Engine Tests
 # ---------------------------------------------------------------------------
 
-class TestContextEngine:
 
+class TestContextEngine:
     def test_context_returns_expected_keys(self, coach, user_id):
         ctx = coach.build_user_context(user_id, TODAY)
         expected_keys = {
-            "user_id", "context_date",
-            "recovery_score", "readiness_state",
-            "sleep_hours", "sleep_quality",
-            "daily_calories", "daily_protein_g", "daily_carbs_g", "daily_fat_g",
-            "calorie_target", "protein_target_g",
+            "user_id",
+            "context_date",
+            "recovery_score",
+            "readiness_state",
+            "sleep_hours",
+            "sleep_quality",
+            "daily_calories",
+            "daily_protein_g",
+            "daily_carbs_g",
+            "daily_fat_g",
+            "calorie_target",
+            "protein_target_g",
             "workout_sessions_7d",
-            "habit_count", "habit_avg_consistency",
+            "habit_count",
+            "habit_avg_consistency",
             "body_weight_kg",
         }
         assert expected_keys.issubset(ctx.keys())
@@ -185,26 +192,26 @@ class TestContextEngine:
 # 3. Recommendation Engine Tests
 # ---------------------------------------------------------------------------
 
-class TestRecommendationEngine:
 
+class TestRecommendationEngine:
     def _make_ctx(self, **overrides):
         base = {
-            "user_id":               "u-ai-test",
-            "context_date":          TODAY,
-            "recovery_score":        80.0,
-            "readiness_state":       "FULL",
-            "sleep_hours":           8.0,
-            "sleep_quality":         8.0,
-            "daily_calories":        2000.0,
-            "daily_protein_g":       150.0,
-            "daily_carbs_g":         200.0,
-            "daily_fat_g":           70.0,
-            "calorie_target":        2000.0,
-            "protein_target_g":      150.0,
-            "workout_sessions_7d":   3,
-            "habit_count":           2,
+            "user_id": "u-ai-test",
+            "context_date": TODAY,
+            "recovery_score": 80.0,
+            "readiness_state": "FULL",
+            "sleep_hours": 8.0,
+            "sleep_quality": 8.0,
+            "daily_calories": 2000.0,
+            "daily_protein_g": 150.0,
+            "daily_carbs_g": 200.0,
+            "daily_fat_g": 70.0,
+            "calorie_target": 2000.0,
+            "protein_target_g": 150.0,
+            "workout_sessions_7d": 3,
+            "habit_count": 2,
             "habit_avg_consistency": 80.0,
-            "body_weight_kg":        80.0,
+            "body_weight_kg": 80.0,
         }
         base.update(overrides)
         return base
@@ -303,8 +310,8 @@ class TestRecommendationEngine:
 # 4. Insight Generator Tests
 # ---------------------------------------------------------------------------
 
-class TestInsightGenerator:
 
+class TestInsightGenerator:
     def test_daily_insight_returns_string(self, coach, user_id):
         result = coach.generate_daily_insight(user_id, TODAY)
         assert isinstance(result, str)
@@ -333,8 +340,8 @@ class TestInsightGenerator:
 
     def test_warning_alerts_empty_when_all_ok(self, coach):
         ctx = {
-            "recovery_score":  85.0,
-            "sleep_hours":     8.0,
+            "recovery_score": 85.0,
+            "sleep_hours": 8.0,
             "daily_protein_g": 150.0,
             "protein_target_g": 150.0,
         }
@@ -343,8 +350,8 @@ class TestInsightGenerator:
 
     def test_warning_alert_for_low_recovery(self, coach):
         ctx = {
-            "recovery_score":  30.0,
-            "sleep_hours":     8.0,
+            "recovery_score": 30.0,
+            "sleep_hours": 8.0,
             "daily_protein_g": 150.0,
             "protein_target_g": 150.0,
         }
@@ -353,8 +360,8 @@ class TestInsightGenerator:
 
     def test_warning_alert_for_low_sleep(self, coach):
         ctx = {
-            "recovery_score":  None,
-            "sleep_hours":     4.0,
+            "recovery_score": None,
+            "sleep_hours": 4.0,
             "daily_protein_g": 150.0,
             "protein_target_g": 150.0,
         }
@@ -363,8 +370,8 @@ class TestInsightGenerator:
 
     def test_warning_alerts_contain_rule_id(self, coach):
         ctx = {
-            "recovery_score":  20.0,
-            "sleep_hours":     3.0,
+            "recovery_score": 20.0,
+            "sleep_hours": 3.0,
             "daily_protein_g": 40.0,
             "protein_target_g": 150.0,
         }
@@ -386,8 +393,8 @@ class TestInsightGenerator:
 # 5. DB Logging Tests
 # ---------------------------------------------------------------------------
 
-class TestAIDBLogging:
 
+class TestAIDBLogging:
     def test_start_session_persists_to_db(self, coach, user_id, db):
         sid = "sess-persist-1"
         coach.start_session(sid, user_id)
@@ -454,24 +461,18 @@ class TestAIDBLogging:
 # 6. Response Validation Tests
 # ---------------------------------------------------------------------------
 
-class TestResponseValidation:
 
+class TestResponseValidation:
     def test_response_always_has_rule_source(self, coach, user_id, session_id):
-        _, response, _ = coach.process_query(
-            session_id, "q-val-1", "r-val-1", user_id, "give me advice", TODAY
-        )
+        _, response, _ = coach.process_query(session_id, "q-val-1", "r-val-1", user_id, "give me advice", TODAY)
         assert response.rule_source, "rule_source must never be empty"
 
     def test_response_rule_source_contains_rule_id(self, coach, user_id, session_id):
-        _, response, _ = coach.process_query(
-            session_id, "q-val-2", "r-val-2", user_id, "recovery advice", TODAY
-        )
+        _, response, _ = coach.process_query(session_id, "q-val-2", "r-val-2", user_id, "recovery advice", TODAY)
         assert "RULE_" in response.rule_source
 
     def test_response_text_is_non_empty(self, coach, user_id, session_id):
-        _, response, _ = coach.process_query(
-            session_id, "q-val-3", "r-val-3", user_id, "fitness tips", TODAY
-        )
+        _, response, _ = coach.process_query(session_id, "q-val-3", "r-val-3", user_id, "fitness tips", TODAY)
         assert response.response_text.strip()
 
     def test_empty_query_raises_validation_error(self, coach, user_id, session_id):
@@ -491,10 +492,6 @@ class TestResponseValidation:
             coach.process_query(session_id, "q-mu", "r-mu", "u-ghost", "test", TODAY)
 
     def test_every_recommendation_in_response_has_rule_source(self, coach, user_id, session_id):
-        _, _, recs = coach.process_query(
-            session_id, "q-all-1", "r-all-1", user_id, "all advice please", TODAY
-        )
+        _, _, recs = coach.process_query(session_id, "q-all-1", "r-all-1", user_id, "all advice please", TODAY)
         for rec in recs:
-            assert rec.rule_source, (
-                f"Recommendation {rec.recommendation_id} is missing rule_source"
-            )
+            assert rec.rule_source, f"Recommendation {rec.recommendation_id} is missing rule_source"
