@@ -31,7 +31,8 @@ cache:
         vulture \
         bandit \
         pytest \
-        pytest-cov
+        pytest-cov \
+        pip-audit
 
 format:
   stage: format
@@ -67,7 +68,7 @@ lint-pylint:
   stage: lint
   <<: *default_before_script
   script:
-    - pylint app/ || true
+    - pylint app/; exit 0
   allow_failure: true
   only:
     - merge_requests
@@ -129,6 +130,16 @@ security-bandit:
   <<: *default_before_script
   script:
     - bandit -r app/ -s B101,B110,B311,B403,B404,B603,B608
+  only:
+    - merge_requests
+    - main
+    - master
+
+security-pip-audit:
+  stage: security
+  <<: *default_before_script
+  script:
+    - pip-audit --ignore-dev
   only:
     - merge_requests
     - main

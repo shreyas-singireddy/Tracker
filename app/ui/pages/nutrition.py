@@ -105,7 +105,9 @@ def render():
                                 try:
                                     nutrition_service.remove_food_from_meal(entry.entry_id)
                                     # Save log recalculation
-                                    nutrition_service.save_daily_nutrition_log(user_id, selected_date)
+                                    nutrition_service.save_daily_nutrition_log(
+                                        f"nl-{uuid.uuid4().hex[:8]}", user_id, selected_date
+                                    )
                                     st.success("Entry removed!")
                                     st.rerun()
                                 except Exception as e:
@@ -140,7 +142,9 @@ def render():
                                 )
                                 nutrition_service.add_food_to_meal(new_entry)
                                 # Save daily log calculation
-                                nutrition_service.save_daily_nutrition_log(user_id, selected_date)
+                                nutrition_service.save_daily_nutrition_log(
+                                    f"nl-{uuid.uuid4().hex[:8]}", user_id, selected_date
+                                )
                                 st.success("Food added successfully!")
                                 st.rerun()
                             except Exception as e:
@@ -153,7 +157,9 @@ def render():
                         try:
                             nutrition_service.delete_meal(m.meal_id)
                             # Save log recalculation
-                            nutrition_service.save_daily_nutrition_log(user_id, selected_date)
+                            nutrition_service.save_daily_nutrition_log(
+                                f"nl-{uuid.uuid4().hex[:8]}", user_id, selected_date
+                            )
                             st.success("Meal deleted!")
                             st.rerun()
                         except Exception as e:

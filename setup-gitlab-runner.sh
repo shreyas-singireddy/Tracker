@@ -319,7 +319,7 @@ REGISTER_ARGS=(
   --config           "$RUNNER_CONFIG_FILE"
 )
 [[ -n "$RUNNER_TAG_LIST" ]] && REGISTER_ARGS+=(--tag-list "$RUNNER_TAG_LIST")
-[[ "$RUNNER_EXECUTOR" == "docker" ]] && REGISTER_ARGS+=(--docker-image "$RUNNER_DOCKER_IMAGE")
+[[ "$RUNNER_EXECUTOR" == "docker" ]] && REGISTER_ARGS+=(--docker-image "$RUNNER_DOCKER_IMAGE" --docker-privileged)
 if gitlab-runner register "${REGISTER_ARGS[@]}"; then
   success "Runner registered."
 else

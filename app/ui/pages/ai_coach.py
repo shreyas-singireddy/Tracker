@@ -114,7 +114,9 @@ def render():
                     q_id = f"q-{uuid.uuid4().hex[:8]}"
                     r_id = f"r-{uuid.uuid4().hex[:8]}"
                     with st.spinner("Processing rule-based response..."):
-                        coach_service.process_query(active_sid, q_id, r_id, user_id, user_query, date_str=selected_date)
+                        coach_service.process_query(
+                            active_sid, q_id, r_id, user_id, user_query, context_date=selected_date
+                        )
                     st.success("Query completed!")
                     st.rerun()
                 except Exception as e:
