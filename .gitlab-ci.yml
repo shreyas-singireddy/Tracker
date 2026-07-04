@@ -20,10 +20,18 @@ cache:
 .default_before_script: &default_before_script
   before_script:
     - python --version
-    - pip --version
+    - python -m pip --version
     - python -m pip install --upgrade pip
-    - pip install -r requirements.txt
-    - pip install ruff mypy flake8 pylint vulture bandit pytest pytest-cov
+    - python -m pip install -r requirements.txt
+    - python -m pip install \
+        "mypy==1.16.0" \
+        ruff \
+        flake8 \
+        pylint \
+        vulture \
+        bandit \
+        pytest \
+        pytest-cov
 
 format:
   stage: format
@@ -70,6 +78,9 @@ type-check:
   stage: type_check
   <<: *default_before_script
   script:
+    - python --version
+    - mypy --version
+    - python -c "import numpy; print('NumPy:', numpy.__version__)"
     - mypy app/ --ignore-missing-imports
   only:
     - merge_requests
@@ -82,7 +93,7 @@ test:
   script:
     - echo "===== Diagnostics ====="
     - pwd
-    - Get-ChildItem
+    - ls -la
     - echo "===== Python Syntax Check ====="
     - python -m compileall .
     - echo "===== Running Tests ====="
